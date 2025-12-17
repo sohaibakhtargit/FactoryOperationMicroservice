@@ -9,7 +9,7 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Infrastructure.Impl
 {
     public sealed class KafkaSettings
     {
-        public string BootstrapServers { get; set; } = "192.168.0.46:29092";
+        public string BootstrapServers { get; set; } = "192.168.0.86:29092";
         public string GroupId { get; set; } = "factoryops-notification.v1"; // use a fresh group id in dev
         public string TopicPattern { get; set; } = "^factoryops\\..+\\..+\\..+$";
         public bool EnableAutoOffsetStore { get; set; } = true;

@@ -310,39 +310,53 @@ public class NotificationProcessor : INotificationProcessor
                     }
                 }
             }
-
-                if (Has("WorkOrderId") && Has("EventType"))
+            if (Has("InventoryId") && Has("EventType"))
+            {
+                string eventType = map["EventType"].GetString() ?? "";
+                if(eventType.Equals("UpdatePurchaseRequest", StringComparison.OrdinalIgnoreCase))
                 {
-                    string eventType = map["EventType"].GetString() ?? "";
-
-                    if (eventType.Equals("Assigned", StringComparison.OrdinalIgnoreCase))
+                    var purchaseReq = payload.Deserialize<InventoryEventDto>(JsonOpts);
+                    if (purchaseReq != null)
                     {
-                        var assignEvt = payload.Deserialize<WorkOrderAssignedEventDto>(JsonOpts);
-                        if (assignEvt != null)
-                        {
-                            _logger.LogInformation("Detected WorkOrderAssigned event.");
-                            await HandleWorkOrderAssignedAsync(assignEvt);
-                            return;
-                        }
-                    }
-
-                    var workOrder = payload.Deserialize<WorkOrderEventDto>(JsonOpts);
-                    if (workOrder != null)
-                    {
-                        _logger.LogInformation("Detected WorkOrder event type={Type}", workOrder.EventType);
-                        await HandleWorkOrderAsync(workOrder);
+                        _logger.LogInformation($"{eventType}.{purchaseReq}");
+                        await HandleUpdatePurchaseRequestAsync(purchaseReq);
                         return;
                     }
                 }
+            }
+
+            if (Has("WorkOrderId") && Has("EventType"))
+            {
+                string eventType = map["EventType"].GetString() ?? "";
+
+                if (eventType.Equals("Assigned", StringComparison.OrdinalIgnoreCase))
+                {
+                    var assignEvt = payload.Deserialize<WorkOrderAssignedEventDto>(JsonOpts);
+                    if (assignEvt != null)
+                    {
+                        _logger.LogInformation("Detected WorkOrderAssigned event.");
+                        await HandleWorkOrderAssignedAsync(assignEvt);
+                        return;
+                    }
+                }
+
+                var workOrder = payload.Deserialize<WorkOrderEventDto>(JsonOpts);
+                if (workOrder != null)
+                {
+                    _logger.LogInformation("Detected WorkOrder event type={Type}", workOrder.EventType);
+                    await HandleWorkOrderAsync(workOrder);
+                    return;
+                }
+            }
     
 
-            _logger.LogWarning("Unknown event received. Raw = {Raw}", jsonPayload);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error while processing event.");
-        }
+        _logger.LogWarning("Unknown event received. Raw = {Raw}", jsonPayload);
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error while processing event.");
+    }
+}
 
     private async Task HandlePurchaseRequestAsync(InventoryEventDto evt)
     {
@@ -354,7 +368,9 @@ public class NotificationProcessor : INotificationProcessor
                 EventType = evt.EventType,
                 Title = $"Purchase Request Created: {evt.InventoryName}",
                 Message = $"A purchase request for {evt.InventoryName} has been created.",
-                TargetUserIds = evt.SupervisorUserIds, 
+                TargetUserIds = evt.SupervisorUserIds,
+                Quantity = evt.Quantity,
+                Cost = evt.Cost,
                 CreatedAt = DateTime.UtcNow,
                 AdditionalDataJson = JsonSerializer.Serialize(evt)
             });
@@ -368,6 +384,32 @@ public class NotificationProcessor : INotificationProcessor
         }
     }
 
+    private async Task HandleUpdatePurchaseRequestAsync(InventoryEventDto evt)
+    {
+        try
+        {
+            await _repo.SaveAsync(new NotificationModel
+            {
+                TenantId = evt.TenantId,
+                EventType = evt.EventType,
+                Title = $"Purchase Request for{evt.InventoryName}",
+                Message = $"A purchase request for order {evt.InventoryName} has been created for you.",
+                TargetUserId = evt.TargetUserId,  
+                Quantity = evt.Quantity,
+                Cost = evt.Cost,
+                CreatedAt = DateTime.UtcNow,
+                AdditionalDataJson= JsonSerializer.Serialize(evt)
+            });
+            await _dispatcher.DispatchUpdatePurchaseRequestAsync(evt);
+         await _emailSender.SendUpdatePurchaseRequestEmailAsync(evt); 
+
+        }
+
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling UpdatePurchaseRequest event.");
+        }
+    }    
     private async Task HandleWorkOrderAsync(WorkOrderEventDto evt)
     {
         try
@@ -406,8 +448,9 @@ public class NotificationProcessor : INotificationProcessor
                 WorkOrderId = evt.WorkOrderId,
                 EventType = "Assigned",
                 Title = "Work Order Assigned",
-                Message = $"You have been assigned work order {evt.WorkOrderNumber}",
+                Message = $"A WorkOrder has been assigned to {evt.AssignedToUserId} WorkOrder Number is:{evt.WorkOrderNumber}",
                 TargetUserId = evt.AssignedToUserId,
+                TargetUserIds = evt.SupervisorUserIds,
                 CreatedAt = DateTime.UtcNow,
                 AdditionalDataJson = JsonSerializer.Serialize(evt)
             });
@@ -458,6 +501,7 @@ public class NotificationProcessor : INotificationProcessor
                 Title = $"Progress Update: {evt.Action}",
                 Message = $"Work Order {evt.WorkOrderNumber} updated to {evt.NewStatus}",
                 CreatedAt = DateTime.UtcNow,
+                TargetUserIds = evt.TargetUserIds,
                 AdditionalDataJson = JsonSerializer.Serialize(evt)
             });
 

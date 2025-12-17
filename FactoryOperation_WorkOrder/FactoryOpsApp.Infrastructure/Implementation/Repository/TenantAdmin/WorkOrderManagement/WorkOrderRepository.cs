@@ -1,7 +1,9 @@
-﻿using FactoryOperation_WorkOrder.FactoryOpsApp.Application.DTOs;
+﻿using CsvHelper;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Application.DTOs;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.AuditLogs;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Common;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Notification;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Services.TenantAdmin.WorkOrderManagement;
 using FactoryOpsApp.Application.Common;
 using FactoryOpsApp.Application.DTOs;
@@ -10,6 +12,9 @@ using FactoryOpsApp.Domain.Entities;
 using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using FactoryOpsApp.Infrastructure.DBContext;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using System.Formats.Asn1;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using static FactoryOperation_WorkOrder.FactoryOpsApp.Common.CommonConstantURLs;
@@ -72,16 +77,16 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
                        TotalCost = x.LaborCost + x.PartCost,
 
                        RequiredTools = tenantDb.WorkOrderRequiredTools
-                    .Where(t => t.WorkOrderId == x.WorkOrderId && !t.IsDeleted)
-                    .Select(t => new WorkOrderToolDto
-                    {
-                        ToolId = t.ToolId,
-                        ToolName = t.Tool != null ? t.Tool.ItemName : null,
-                        QuantityRequired = t.QuantityRequired ?? 0
-                    })
-                    .ToList()
+                        .Where(t => t.WorkOrderId == x.WorkOrderId && !t.IsDeleted)
+                        .Select(t => new WorkOrderToolDto
+                        {
+                            ToolId = t.ToolId,
+                            ToolName = t.Tool != null ? t.Tool.ItemName : null,
+                            QuantityRequired = t.QuantityRequired ?? 0
+                        })
+                        .ToList()
                    })
-                .ToListAsync();
+                   .ToListAsync();
 
 
                 response.StatusCode = StatusCode.Success;
@@ -174,7 +179,123 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
             res.EnsureSuccessStatusCode();
         }
 
+        private List<T> ReadCsvFile<T>(IFormFile file) where T : new()
+        {
+            using var reader = new StreamReader(file.OpenReadStream());
+            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+            return csv.GetRecords<T>().ToList();
+        }
 
+        public async Task<BulkWorkOrderImportResult> ImportBulkWorkOrdersAsync(
+            BulkWorkOrderImportRequest request)
+        {
+
+            using var tenantDb = _tenantDbContext.GetTenantDbContext(request.TenantId);
+
+            var relativePath = await _fileStorageService.SaveFileAsync(
+                request.File,
+                "uploads/bulk-workorders"
+            );
+
+            var bulkImport = new WorkOrderBulkImport
+            {
+                TenantId = request.TenantId,
+                FileName = request.File.FileName,
+                FilePath = relativePath, 
+                UploadedBy = request.CreatedBy,
+                UploadedAt = DateTime.UtcNow
+            };
+            tenantDb.WorkOrderBulkImports.Add(bulkImport);
+            await tenantDb.SaveChangesAsync(); 
+
+            var result = new BulkWorkOrderImportResult();
+            var rows = ReadCsvFile<WorkOrderImportCsvDto>(request.File);
+
+            result.TotalRecords = rows.Count;
+
+            int rowNumber = 1;
+
+            foreach (var row in rows)
+            {
+                try
+                {
+                    var dto = new WorkOrderCreateDto
+                    {
+                        TenantId = request.TenantId,
+                        Title = row.Title,
+                        Description = row.Description,
+                        LocationId = row.LocationId,
+                        Priority = Enum.TryParse<PriorityLevel>(row.Priority, true, out var p)
+                            ? p
+                            : PriorityLevel.Medium,
+                        WorkOrderType = Enum.TryParse<WorkOrderTypeEnum>(row.WorkOrderType, true, out var t)
+                            ? t
+                            : WorkOrderTypeEnum.Preventive,
+                        AssignedToUserId = row.AssignedToUserId > 0 ? row.AssignedToUserId : null,
+                        AssignedToTeamId = row.AssignedToTeamId > 0 ? row.AssignedToTeamId : null,
+              
+                        DueDate = row.DueDate.HasValue
+                        ? ToUtc(row.DueDate.Value)
+                        : DateTime.UtcNow,
+
+                                        ScheduleDate = row.ScheduleDate.HasValue
+                        ? ToUtc(row.ScheduleDate.Value)
+                        : (DateTime?)null,
+
+                        EstimatedDurationMinutes = row.EstimatedDurationMinutes,
+                        AssetId = row.AssetId,
+                        Instructions = row.Instructions,
+                        LaborCost = row.LaborCost ?? 0,
+                        PartCost = row.PartCost ?? 0,
+                        CreatedBy = request.CreatedBy,
+                        BulkImportId = bulkImport.BulkImportId, 
+                        RequiredTools = row.ToolId.HasValue
+                            ? new List<WorkOrderToolDto>
+                            {
+                        new WorkOrderToolDto
+                        {
+                            ToolId = row.ToolId.Value,
+                            QuantityRequired = row.QuantityRequired.HasValue && row.QuantityRequired > 0
+                                ? row.QuantityRequired.Value
+                                : 1
+                        }
+                            }
+                            : new List<WorkOrderToolDto>()
+                    };
+
+                    await CreateWorkOrderAsync(dto);
+                    result.SuccessCount++;
+                }
+                catch (Exception ex)
+                {
+                    result.FailureCount++;
+                    result.Errors.Add(new BulkWorkOrderError
+                    {
+                        RowNumber = rowNumber,
+                        ErrorMessage = ex.InnerException?.Message ?? ex.Message
+                    });
+                }
+
+                rowNumber++;
+            }
+         
+            bulkImport.TotalRecords = result.TotalRecords;
+            bulkImport.SuccessCount = result.SuccessCount;
+            bulkImport.FailureCount = result.FailureCount;
+            await tenantDb.SaveChangesAsync();
+
+            return result;
+        }
+
+        private static DateTime ToUtc(DateTime dateTime)
+        {
+            return dateTime.Kind switch
+            {
+                DateTimeKind.Utc => dateTime,
+                DateTimeKind.Local => dateTime.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
+            };
+        }
         public async Task<CommonResponseModel> CreateWorkOrderAsync(WorkOrderCreateDto dto)
         {
             var response = new CommonResponseModel();
@@ -243,6 +364,7 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
                 ScheduleDate = dto.ScheduleDate,
                 EstimatedDurationMinutes = dto.EstimatedDurationMinutes,
                 AssetId = dto.AssetId,
+                BulkImportId = dto.BulkImportId, 
                 Instructions = dto.Instructions,
                 LaborCost = dto.LaborCost,
                 PartCost = dto.PartCost,
@@ -342,11 +464,34 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
                 .Select(x => x.UserId)
                 .ToListAsync();
 
+            // Fetch the assigned user for the asset
+
+            var assignedToUserId = await tenantDb.AssetRegistry
+                 .Where(x => x.AssetId == dto.AssetId && x.IsActive && !x.IsDeleted)
+                 .Join(
+                     tenantDb.AssetTracking,
+                     assetRegistry => assetRegistry.AssetId,
+                     assetTracking => assetTracking.AssetId,
+                     (assetRegistry, assetTracking) => assetTracking
+                 )
+                 .Where(x => !x.IsDeleted)
+                 .Select(x => x.AssignedTo)
+                 .FirstOrDefaultAsync();
+
             var supervisorUsers = supervisorUserId
                 .Concat(productionSupervisorUserId)
                 .Distinct()
                 .Select(x => (int?)x)
                 .ToList();
+
+            if (assignedToUserId.HasValue)
+            {
+                supervisorUsers.Add(assignedToUserId.Value);
+            }
+
+
+
+
 
             var eventDto = new WorkOrderEventDto
             {
@@ -405,7 +550,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
 
             return response;
         }
-
 
         public async Task<CommonResponseModel> UpdateWorkOrderAsync(WorkOrderUpdateDto dto)
         {
@@ -596,8 +740,30 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
 
                 await tenantDb.SaveChangesAsync();
 
-                if (entity.AssignedToUserId.HasValue)
+        if (entity.AssignedToUserId.HasValue)
+                
+            {
+                var assignedToUserId = await tenantDb.AssetRegistry
+                         .Where(x => x.AssetId == dto.AssetId && x.IsActive && !x.IsDeleted)
+                         .Join(
+                             tenantDb.AssetTracking,
+                             assetRegistry => assetRegistry.AssetId,
+                             assetTracking => assetTracking.AssetId,
+                             (assetRegistry, assetTracking) => assetTracking
+                         )
+                         .Where(x => !x.IsDeleted)
+                         .Select(x => x.AssignedTo)
+                         .FirstOrDefaultAsync();
+
+                var supervisorUserIds = new List<int?> { entity.AssignedToUserId }; 
+
+                if (assignedToUserId.HasValue)
                 {
+                    supervisorUserIds.Add(assignedToUserId.Value);
+                }
+
+                supervisorUserIds = supervisorUserIds.Distinct().ToList();
+
                 var eventDto = new WorkOrderEventDto
                 {
                     WorkOrderId = entity.WorkOrderId,
@@ -610,7 +776,8 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
                     Status = entity.Status.ToString(),
                     TargetUserId = entity.AssignedToUserId,
                     AssignedToUserId = entity.AssignedToUserId,
-                    AssignedToTeamId = entity.AssignedToTeamId
+                    AssignedToTeamId = entity.AssignedToTeamId,
+                    SupervisorUserIds = supervisorUserIds
                 };
 
                 var correlationId = Guid.NewGuid().ToString();
@@ -692,7 +859,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
            
             return response;
         }
-
 
         public async Task<CommonResponseModel> DeleteWorkOrderAsync(int WorkOrderId, int tenantId)
         {
@@ -1131,9 +1297,35 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.WorkOrderManagemen
                     .Where(x => x.TenantId == dto.TenantId && x.RoleId == supervisorRoleId)
                     .Select(x => x.UserId)
                     .ToListAsync();
-                var userIds = supervisorUserId.ToList();
+                 var userIds = supervisorUserId.ToList();
 
-                var nullableUserIds = userIds.Select(id => (int?)id).ToList();
+                List<int?> nullableUserIds;
+
+                if (workOrder.Status == WorkOrderStatus.Completed)
+                {
+                    var assignedToUserId = await tenantDb.AssetRegistry
+                        .Where(x => x.AssetId == workOrder.AssetId && x.IsActive && !x.IsDeleted)
+                        .Join(
+                            tenantDb.AssetTracking,
+                            assetRegistry => assetRegistry.AssetId,
+                            assetTracking => assetTracking.AssetId,
+                            (assetRegistry, assetTracking) => assetTracking
+                        )
+                        .Where(x => !x.IsDeleted)
+                        .Select(x => x.AssignedTo)
+                        .FirstOrDefaultAsync();
+
+                    if (assignedToUserId.HasValue)
+                    {
+                        userIds.Add(assignedToUserId.Value);
+                    }
+
+                    nullableUserIds = userIds.Select(id => (int?)id).ToList();
+                }
+                else
+                {
+                    nullableUserIds = userIds.Select(id => (int?)id).ToList();
+                }
 
                 var progressEvent = new WorkOrderProgressUpdatedEventDto
                 {

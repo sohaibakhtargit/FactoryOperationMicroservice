@@ -26,6 +26,7 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Common.Models
         public string EventType { get; set; } = "Assigned";
         public DateTime EventTime { get; set; }
         public int? TargetUserId { get; set; }
+        public List<int?> SupervisorUserIds { get; set; } = new();
     }
     public class LowStockEventDto 
     {
@@ -77,6 +78,7 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Common.Models
         public int TenantId { get; set; }
         public int? InventoryId { get; set; }
         public string InventoryName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
         public string EventType { get; set; } = string.Empty;
         public DateTime EventTime { get; set; }
         public string? Priority { get; set; }
@@ -85,6 +87,8 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Common.Models
         public List<int?> TargetUserIds { get; set; } = new();
         public int? SupplierId { get; set; }
         public int? TargetUserId { get; set; }
+        public Decimal? Cost { get; set; }
+
     }
 
 }

@@ -7,9 +7,13 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
 
-var builder = WebApplication.CreateBuilder(args);
+//var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    WebRootPath = "wwwroot"
+});
 var envMode = builder.Configuration.GetValue<string>("EnvironmentMode");
-
 //builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -114,7 +118,6 @@ builder.Services.AddCors(options =>
         );
 });
 
-
 var app = builder.Build();
 
 
@@ -128,7 +131,7 @@ if (envMode == "Local" || envMode == "Staging")
 
 app.UseCors("CorsPolicy");
 app.UseExceptionLogging();
-
+app.UseStaticFiles();
 app.UseHttpsRedirection();
 
 app.UseAuthentication();

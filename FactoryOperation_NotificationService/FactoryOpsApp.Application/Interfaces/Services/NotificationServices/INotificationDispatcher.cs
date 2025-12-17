@@ -9,5 +9,6 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Application.Interfa
         Task DispatchProgressUpdateAsync(WorkOrderProgressUpdatedEventDto evt);
         Task DispatchAssignedToUserAsync(WorkOrderAssignedEventDto evt);
         Task DispatchPurchaseRequestAsync(InventoryEventDto evt);
+        Task DispatchUpdatePurchaseRequestAsync(InventoryEventDto evt);
     }
 }

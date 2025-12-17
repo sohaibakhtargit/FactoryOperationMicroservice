@@ -1,0 +1,3 @@
+Title,Description,LocationId,Priority,WorkOrderType,AssignedToUserId,AssignedToTeamId,DueDate,ScheduleDate,EstimatedDurationMinutes,AssetId,Instructions,LaborCost,PartCost,ToolId,QuantityRequired
+CSV CSV - LATEST,Connectivity issue,46,Low,Preventive,,,12/16/2025 0:00,12/16/2025 0:00,0,13,string,50,90,10,2
+CNC CSV - LATEST,Connectivity issue,46,Low,Preventive,,,12/16/2025 0:00,12/16/2025 0:00,0,13,string,50,90,11,1

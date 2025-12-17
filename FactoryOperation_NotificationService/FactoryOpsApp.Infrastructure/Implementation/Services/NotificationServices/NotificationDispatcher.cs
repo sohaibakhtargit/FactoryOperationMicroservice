@@ -115,16 +115,26 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Infrastructure.Impl
         {
             var tasks = new List<Task>();
 
-            string tenantGroup = $"tenant-{evt.TenantId}";
+          //  string tenantGroup = $"tenant-{evt.TenantId}";
 
             try
             {
-                if (evt.AssignedToUserId.HasValue)
+              /*  if (evt.AssignedToUserId.HasValue)
                 {
                     tasks.Add(_hub.Clients.User(evt.AssignedToUserId.Value.ToString())
                         .SendAsync("WorkOrderAssignedNotification", evt));
+                }*/
+                if (evt.SupervisorUserIds != null)
+                {
+                    foreach (var userId in evt.SupervisorUserIds)
+                    {
+                        if (userId.HasValue)
+                        {
+                            tasks.Add(_hub.Clients.User(userId.Value.ToString())
+                                .SendAsync("PurchaseRequisitionCreated", evt));
+                        }
+                    }
                 }
-
                 await Task.WhenAll(tasks);
 
                 _logger.LogInformation($"Notification sent to user: user-{evt.AssignedToUserId}");
@@ -143,7 +153,7 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Infrastructure.Impl
             if (evt.TargetUserIds !=null)
                 tasks.Add(_hub.Clients.User(evt.TargetUserIds.ToString())
                     .SendAsync("LowStockNotification", evt));
-      
+           
 
             await Task.WhenAll(tasks);
         }
@@ -161,6 +171,16 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Infrastructure.Impl
                             .SendAsync("PurchaseRequisitionCreated", evt));
                     }
                 }
+            }
+        }
+
+        public async Task DispatchUpdatePurchaseRequestAsync(InventoryEventDto evt)
+        {
+            var tasks = new List<Task>();
+            if(evt.TargetUserIds != null)
+            {
+                tasks.Add(_hub.Clients.User(evt.TargetUserId.ToString())
+                    .SendAsync("UpdatePurchaseRequest", evt));
             }
         }
             public async Task DispatchProgressUpdateAsync(WorkOrderProgressUpdatedEventDto evt)

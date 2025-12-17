@@ -36,6 +36,50 @@ namespace FactoryOpsApp.Application.DTOs
         }
 
     }
+    public class BulkWorkOrderImportRequest
+    {
+        public int TenantId { get; set; }
+        public int CreatedBy { get; set; }
+        public IFormFile File { get; set; }
+    }
+
+    public class BulkWorkOrderImportResult
+    {
+        public int TotalRecords { get; set; }
+        public int SuccessCount { get; set; }
+        public int FailureCount { get; set; }
+        public List<BulkWorkOrderError> Errors { get; set; } = new();
+    }
+
+    public class BulkWorkOrderError
+    {
+        public int RowNumber { get; set; }
+        public string ErrorMessage { get; set; }
+    }
+
+    public class WorkOrderImportCsvDto
+    {
+        public string Title { get; set; }
+        public string? Description { get; set; }
+        public int? LocationId { get; set; }
+        public string? Priority { get; set; }
+        public string? WorkOrderType { get; set; }
+        public int? AssignedToUserId { get; set; }
+        public int? AssignedToTeamId { get; set; }
+        public DateTime? DueDate { get; set; }
+        public DateTime? ScheduleDate { get; set; }
+        public int? EstimatedDurationMinutes { get; set; }
+        public int? AssetId { get; set; }
+        public string? Instructions { get; set; }
+        public decimal? LaborCost { get; set; }
+        public decimal? PartCost { get; set; }
+
+        // Required tools
+        public int? ToolId { get; set; }
+        public int? QuantityRequired { get; set; }
+    }
+
+
     public class WorkOrderCreateDto
     {
         public int WorkOrderId { get; set; }
@@ -61,6 +105,8 @@ namespace FactoryOpsApp.Application.DTOs
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;
         public int? UpdatedBy { get; set; }
+        public int? BulkImportId { get; set; }
+
         public List<WorkOrderToolDto>? RequiredTools
         {
             get; set;
@@ -69,7 +115,7 @@ namespace FactoryOpsApp.Application.DTOs
         public class WorkOrderToolDto
         {
             public int? ToolId { get; set; }
-            public string? ToolName { get; set; }   // ✅ add this field
+            public string? ToolName { get; set; }  
 
             public int? QuantityRequired { get; set; }
         }

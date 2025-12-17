@@ -21,5 +21,7 @@ namespace FactoryOpsApp.Infrastructure.Service.TenantAdmin.InventoryManagement
             => _purchaseRequisitionRepository.GetByIdAsync(tenantId, id);
         public Task<CommonResponseModel> CreatePurchaseRequestAsync(PurchaseRequest Dto)
           => _purchaseRequisitionRepository.CreatePurchaseRequestAsync(Dto);
+        public Task<CommonResponseModel> UpdatePurchaseRequestAsync(PurchaseRequest dto)
+            => _purchaseRequisitionRepository.UpdatePurchaseRequestAsync(dto);
     }
 }

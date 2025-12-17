@@ -1,5 +1,7 @@
 ﻿using FactoryOpsApp.Application.Common;
 using FactoryOpsApp.Application.DTOs;
+using FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.WorkOrderManagement;
+using Microsoft.AspNetCore.Mvc;
 using static FactoryOpsApp.Application.DTOs.WorkOrderCreateDto;
 
 namespace FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.WorkOrderManagement
@@ -8,6 +10,8 @@ namespace FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.WorkOrderMan
     {
         Task<GetAllRecord<WorkOrderDto>> GetWorkOrderAllAsync(int tenantId, WorkOrderTypeEnum workOrderType);
         Task<CommonResponseModel> CreateWorkOrderAsync(WorkOrderCreateDto dto);
+ 
+        Task <BulkWorkOrderImportResult> ImportBulkWorkOrdersAsync(BulkWorkOrderImportRequest request);
         Task<GetSpecificRecord<WorkOrderDto>> GetWorkOrderByIdAsync(int WorkOrderId, int tenantId);
         Task<CommonResponseModel> UpdateWorkOrderAsync(WorkOrderUpdateDto dto);
         Task<CommonResponseModel> UpdateWorkOrderProgressAsync(WorkOrderProgresssUpdateDto dto);

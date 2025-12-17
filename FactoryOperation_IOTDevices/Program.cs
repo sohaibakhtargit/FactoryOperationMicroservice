@@ -23,6 +23,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddDbContext<MasterFactoryOpsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("MasterDbConnection")));
@@ -36,25 +37,30 @@ builder.Services.AddScoped<TenantDbContextFactory>();
 // IOT Device Management
 /*builder.Services.AddScoped<IFactoryGroupService, FactoryGroupService>();
 builder.Services.AddScoped<IFactoryGroupRepository, FactoryGroupRepository>();*/
-
-builder.Services.AddScoped<IFactoryMqttTopicService, FactoryMqttTopicService>();
-builder.Services.AddScoped<IFactoryMqttTopicRepository, FactoryMqttTopicRepository>();
-
-builder.Services.AddScoped<IFactoryDeviceService, FactoryDeviceService>();
-builder.Services.AddScoped<IFactoryDeviceRepository, FactoryDeviceRepository>();
-
 builder.Services.AddScoped<IAlertRuleService, AlertRuleService>();
 builder.Services.AddScoped<IAlertRuleRepository, AlertRuleRepository>();
-
-builder.Services.AddScoped<ITelemetryRepository, TelemetryRepository>();
-builder.Services.AddSingleton<IMqttMessageHandler, MqttMessageHandler>();
-builder.Services.AddScoped<IDeviceStatusService, DeviceStatusService>();
 
 builder.Services.AddScoped<IDeviceConfigurationService, DeviceConfigurationService>();
 builder.Services.AddScoped<IDeviceConfigurationRepository, DeviceConfigurationRepository>();
 
-builder.Services.AddScoped<IExceptionLoggerService, ExceptionLoggerService>();
+builder.Services.AddScoped<IFactoryDeviceService, FactoryDeviceService>();
+builder.Services.AddScoped<IFactoryDeviceRepository, FactoryDeviceRepository>();
 
+builder.Services.AddScoped<IFactoryMqttTopicService, FactoryMqttTopicService>();
+builder.Services.AddScoped<IFactoryMqttTopicRepository, FactoryMqttTopicRepository>();
+
+builder.Services.AddScoped<IReorderRuleService, ReorderRuleService>();
+builder.Services.AddScoped<IReorderRuleRepository, ReorderRuleRepository>();
+
+builder.Services.AddScoped<ISupplierManagementRepository, SupplierManagementRepository>();
+builder.Services.AddScoped<ISupplierManagementService, SupplierManagementService>();
+
+builder.Services.AddScoped<ITelemetryRepository, TelemetryRepository>();
+
+builder.Services.AddSingleton<IMqttMessageHandler, MqttMessageHandler>();
+builder.Services.AddScoped<IDeviceStatusService, DeviceStatusService>();
+
+builder.Services.AddScoped<IExceptionLoggerService, ExceptionLoggerService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // MQTT IOT SERVICES REGISTRATION

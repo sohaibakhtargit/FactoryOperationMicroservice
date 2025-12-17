@@ -3,7 +3,7 @@
 
     public class KafkaSettings
     {
-        public string BootstrapServers { get; set; } = "192.168.0.46:29092";
+        public string BootstrapServers { get; set; } = "192.168.0.86:29092";
         public string Topic { get; set; } = "factory-telemetry-stream";
         public string ConsumerTopic { get; set; } = "factory-commands";
         public string GroupId { get; set; } = "factoryops-bridge-group";

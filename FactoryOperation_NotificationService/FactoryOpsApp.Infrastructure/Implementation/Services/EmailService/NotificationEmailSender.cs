@@ -215,7 +215,6 @@ using FactoryOperation_NotificationService.FactoryOpsApp.Application.DTOs;
 using FactoryOperation_NotificationService.FactoryOpsApp.Application.Interfaces.Services;
 using FactoryOperation_NotificationService.FactoryOpsApp.Application.Interfaces.Services.EmailServices;
 using FactoryOperation_NotificationService.FactoryOpsApp.Common.Models;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace FactoryOperation_NotificationService.FactoryOpsApp.Infrastructure.Implementation.Services.EmailService
@@ -336,7 +335,7 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Infrastructure.Impl
 
                 Body = BuildEmailTemplate(
                     title: "Work Order Assigned to You",
-                    headerColor: "#28A745",
+                     headerColor: "#17A2B8",
                     content: $@"
                         <p><strong>Work Order Number:</strong> {evt.WorkOrderNumber}</p>
                         <p><strong>Title:</strong> {evt.Title}</p>
@@ -361,15 +360,41 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Infrastructure.Impl
                 Subject = $"Purchase Request Created: {evt.InventoryName}",
                 Body = BuildEmailTemplate(
                     title: "New Purchase Request Created",
-                    headerColor: "#6F42C1",
+                    headerColor: "#17A2B8",
                     content: $@"
                         <p><strong>Purchase Requisition ID:</strong> {evt.PurchaseRequisitionId}</p>
                         <p><strong>Inventory Name:</strong> {evt.InventoryName}</p>
+                         <p><strong>Inventory Quantity:</strong> {evt.Quantity}</p>
+                        <p><strong>Inventory Estimated Cost:</strong>{evt.Cost}</p>
                         <p><strong>Event Type:</strong> {evt.EventTime}</p>
                         <p><strong>Tenant ID:</strong> {evt.TenantId}</p>"
                 )
 
             };
+            await _emailService.SendEmailAsync(emailDto);
+
+        }
+        public async Task SendUpdatePurchaseRequestEmailAsync(InventoryEventDto evt)
+        {
+            var emailDto = new EmailDTO
+            {
+                From = _settings.From ?? "no-reply@factoryops.com",
+                To = "factory.operation@yopmail.com",
+                Subject = $" Order Recieved : {evt.InventoryName}", 
+                Body = BuildEmailTemplate(
+                    title: "Purchase Order Request",
+                      headerColor: "#17A2B8",
+                         content: $@"
+                        <p><strong>Purchase Requisition ID:</strong> {evt.PurchaseRequisitionId}</p>
+                        <p><strong>Inventory Name:</strong> {evt.InventoryName}</p>
+                        <p><strong>Inventory Quantity:</strong> {evt. Quantity}</p>
+                        <p><strong>Inventory Estimated Cost:</strong>{evt.Cost}</p>
+                        <p><strong>Event Type:</strong> {evt.EventTime}</p>
+                        <p><strong>Tenant ID:</strong> {evt.TenantId}</p>"
+                    )
+            };
+            await _emailService.SendEmailAsync(emailDto);
+
         }
         private string BuildEmailTemplate(string title, string headerColor, string content)
         {

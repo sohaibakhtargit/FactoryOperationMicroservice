@@ -8,6 +8,8 @@ namespace FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.WorkOrde
     {
         Task<GetAllRecord<WorkOrderDto>> GetWorkOrderAllAsync(int tenantId, WorkOrderTypeEnum workOrderType);
         Task<CommonResponseModel> CreateWorkOrderAsync(WorkOrderCreateDto dto);
+        Task<BulkWorkOrderImportResult> ImportBulkWorkOrdersAsync(BulkWorkOrderImportRequest request);
+
         Task<GetSpecificRecord<WorkOrderDto>> GetWorkOrderByIdAsync(int WorkOrderId, int tenantId);
         Task<CommonResponseModel> UpdateWorkOrderAsync(WorkOrderUpdateDto dto);
         Task<CommonResponseModel> UpdateWorkOrderProgressAsync(WorkOrderProgresssUpdateDto dto);

@@ -59,5 +59,12 @@ namespace FactoryOperation_Inventory.Controllers.TenantAdminContoller.InventoryM
             var result = await _purchaseRequisitionService.CreatePurchaseRequestAsync(dto);
             return Ok(result);
         }
+        [HttpPost("Update-PurchaseRequest")]
+        public async Task<ActionResult<CommonResponseModel>> UpdatePurchaseRequestAsync([FromBody] PurchaseRequest dto)
+
+        {
+            var result = await _purchaseRequisitionService.UpdatePurchaseRequestAsync(dto);
+            return Ok(result);
+        }
     }
 }

@@ -133,5 +133,8 @@ namespace FactoryOpsApp.Application.DTOs
         public List<int?> SupervisorUserIds { get; set; } = new();
         public int? SupplierId { get; set; }
         public int? TargetUserId { get; set; }
+        public int Quantity { get; set; }
+        public Decimal? Cost { get; set; }
+
     }
 }

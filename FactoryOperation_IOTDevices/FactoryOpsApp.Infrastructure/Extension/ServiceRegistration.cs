@@ -18,7 +18,9 @@ namespace FactoryOperation_IOTDevices.FactoryOpsApp.Infrastructure.Extension
             services.AddSingleton<IMqttService>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger<MqttService>>();
-                var settings = mqttConfig.Get<MqttSettings>();
+                //var settings = mqttConfig.Get<MqttSettings>();
+                var settings = mqttConfig.Get<MqttSettings>() ?? new MqttSettings();
+
 
                 return new MqttService(
                     settings.BrokerUrl,

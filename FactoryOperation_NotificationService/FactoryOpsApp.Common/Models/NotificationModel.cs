@@ -9,6 +9,8 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Common.Models
         public string EventType { get; set; } = string.Empty;
         public int? TargetUserId { get; set; }
         public List<int?> TargetUserIds { get; set; } = new();
+        public int?Quantity { get; set; }
+        public Decimal? Cost { get; set; }
 
         public int? TargetTeamId { get; set; }
         public string Message { get; set; } = string.Empty;

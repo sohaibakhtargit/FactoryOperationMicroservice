@@ -5,7 +5,6 @@ using FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.InventoryMan
 using FactoryOpsApp.Application.Interfaces.Services.SuperAdmin.AuditLogs;
 using FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Common;
 using FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Notification;
-using FactoryOpsApp.Domain.Entities;
 using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using FactoryOpsApp.Infrastructure.DBContext;
 using Microsoft.EntityFrameworkCore;

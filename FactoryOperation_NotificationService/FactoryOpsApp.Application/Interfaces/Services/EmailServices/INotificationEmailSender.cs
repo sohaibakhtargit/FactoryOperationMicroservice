@@ -9,5 +9,6 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Application.Interfa
         Task SendWorkOrderProgressEmailAsync(WorkOrderProgressUpdatedEventDto evt);
         Task SendWorkOrderAssignedEmailAsync(WorkOrderAssignedEventDto evt);
         Task SendPurchaseRequestEmailAsync(InventoryEventDto evt);
+        Task SendUpdatePurchaseRequestEmailAsync(InventoryEventDto evt);
     }
 }

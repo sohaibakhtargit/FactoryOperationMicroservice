@@ -144,17 +144,7 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
                 };
 
                 await context.PurchaseRequisitions.AddAsync(newRequisition);
-                await context.SaveChangesAsync();
-
-            /*    var supervisorRoleId = await context.FactoryRoles
-                    .Where(x => x.RoleName == "Maintenance Supervisor")
-                    .Select(x => x.RoleId)
-                    .FirstOrDefaultAsync();
-
-                var supervisorUserId = await context.FactoryUserRoles
-                    .Where(x => x.TenantId == dto.TenantId && x.RoleId == supervisorRoleId)
-                    .Select(x => x.UserId)
-                    .ToListAsync();*/
+               
 
                 var productionSupervisorRoleId = await context.FactoryRoles
                     .Where(x => x.RoleName == "Production Supervisor")
@@ -181,34 +171,14 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
                     Priority = dto.Priority.ToString(),
                     Status = dto.Status.ToString(),
                     SupervisorUserIds = supervisorUsers,
+                    Quantity = dto.Quantity,
+                    Cost = dto.EstimatedCost,
                 };
 
 
-                {
-                    var correlationId = Guid.NewGuid().ToString();
-                    string topicName = KafkaCommonTopics.BuildTopicName(dto.TenantId, eventDto.EventType);
+                await PublishKafkaEventAsyncc(dto.TenantId, dto.InventoryName, eventDto);
 
-                    var kafkaRequest = new
-                    {
-                        Topic = topicName,
-                        Key = $"Inventory-{dto.InventoryName}",
-                        Payload = eventDto,
-                        Source = "InevtoryService",
-                        Headers = new Dictionary<string, string>
-                        {
-                            ["tenant-id"] = dto.TenantId.ToString(),
-                            ["correlation-id"] = correlationId
-                        }
-                    };
-
-                    var kafkaApiUrl = ConstantUrls.kafkaPublish;
-
-                    using var httpClient = new HttpClient();
-                    var jsonContent = new StringContent(JsonSerializer.Serialize(kafkaRequest), Encoding.UTF8, "application/json");
-
-                    var kafkaResponse = await httpClient.PostAsync(kafkaApiUrl, jsonContent);
-                    kafkaResponse.EnsureSuccessStatusCode();
-                }
+                await context.SaveChangesAsync();
 
                 response.StatusCode = StatusCode.Success;
                 response.StatusMessage = PurchaseRequisitionStatusMessage.CreateSuccess;
@@ -224,6 +194,122 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
 
             return response;
         }
+
+
+        private async Task PublishKafkaEventAsyncc(int tenantId, string inventoryName, InventoryEventDto eventDto)  
+        {
+            var correlationId = Guid.NewGuid().ToString();
+            string topicName = KafkaCommonTopics.BuildTopicName(tenantId, eventDto.EventType);
+
+            var kafkaRequest = new
+            {
+                Topic = topicName,
+                Key = $"Inventory-{inventoryName}",
+                Payload = eventDto,
+                Source = "InventoryService",
+                Headers = new Dictionary<string, string>
+                {
+                    ["tenant-id"] = tenantId.ToString(),
+                    ["correlation-id"] = correlationId
+                }
+            };
+
+            using var httpClient = new HttpClient();
+            var jsonContent = new StringContent(
+                JsonSerializer.Serialize(kafkaRequest),
+                Encoding.UTF8,
+                "application/json"
+            );
+
+            var kafkaResponse = await httpClient.PostAsync(ConstantUrls.kafkaPublish, jsonContent);
+            kafkaResponse.EnsureSuccessStatusCode();
+        }
+
+
+        public async Task<CommonResponseModel> UpdatePurchaseRequestAsync(PurchaseRequest dto)
+        {
+            var response = new CommonResponseModel();
+
+            using var context = _tenantDbContextFactory.GetTenantDbContext(dto.TenantId);
+
+            try
+            {
+            
+                var existingRequisition = await context.PurchaseRequisitions
+                    .FirstOrDefaultAsync(x =>
+                        x.PurchaseRequisitionId == dto.PurchaseRequisitionId &&
+                        x.TenantId == dto.TenantId &&
+                        !x.IsDeleted);
+
+                if (existingRequisition == null)
+                {
+                    response.StatusCode = StatusCode.NotFound;
+                    response.StatusMessage = "Purchase Requisition Not Found";
+                    return response;
+                }
+
+             
+                existingRequisition.RequisitionId = dto.RequisitionId;
+                existingRequisition.ReorderRuleId = dto.ReorderRuleId;
+                existingRequisition.InventoryId = dto.InventoryId;
+                existingRequisition.Quantity = dto.Quantity;
+                existingRequisition.EstimatedCost = dto.EstimatedCost;
+                existingRequisition.Priority = dto.Priority;
+     
+                existingRequisition.GeneratedDate = dto.GeneratedDate;
+                existingRequisition.ManagerAprovalStatus = dto.ManagerAprovalStatus;
+                existingRequisition.SupplierManagementId = dto.SupplierManagementId;
+                existingRequisition.SupplierAcceptanceStatus = dto.SupplierAcceptanceStatus;
+                existingRequisition.SupplierComment = dto.SupplierComment;
+                existingRequisition.Status = dto.Status;
+                existingRequisition.ExpectedDeliveryDate = dto.ExpectedDeliveryDate;
+                existingRequisition.UpdatedBy = dto.UpdatedBy ?? dto.CreatedBy;
+                existingRequisition.UpdatedDate = DateTime.UtcNow;
+
+
+
+               if (dto.ManagerAprovalStatus == ManagerAprovalStatus.Approved)
+                {
+                    var eventDto = new InventoryEventDto
+                    {
+                        InventoryId = dto.InventoryId,
+                        TenantId = dto.TenantId,
+                        InventoryName = dto.InventoryName,
+                        EventType = "UpdatePurchaseRequest",
+                        EventTime = DateTime.UtcNow,
+                        Priority = dto.Priority.ToString(),
+                        Status = dto.Status.ToString(),
+                        TargetUserId = dto.SupplierManagementId,
+                        Quantity = dto.Quantity,
+                        Cost = dto.EstimatedCost,
+
+                    };
+
+                    await PublishKafkaEventAsyncc(dto.TenantId, dto.InventoryName, eventDto);
+                }
+
+                await context.SaveChangesAsync();
+
+                response.StatusCode = StatusCode.Success;
+                response.StatusMessage = "Purchase Requisition Updated Successfully";
+            }
+            catch (Exception ex)
+            {
+                await _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "PurchaseRequisitionRepository",
+                    "UpdatePurchaseRequestAsync",
+                    dto.TenantId,
+                    dto.CreatedBy
+                );
+
+                response.StatusCode = StatusCode.Error;
+                response.StatusMessage = "Purchase Requisition Update Failed";
+            }
+
+            return response;
+        }
+
     }
 
 }

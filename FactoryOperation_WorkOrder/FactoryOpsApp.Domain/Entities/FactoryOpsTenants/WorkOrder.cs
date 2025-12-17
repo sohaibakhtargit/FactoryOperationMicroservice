@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using FactoryOperation_WorkOrder.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
@@ -55,7 +56,10 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public decimal? LaborCost { get; set; } = 0;
         public decimal? PartCost { get; set; } = 0;
         public decimal? TotalCost { get; set; } = 0;
+        public int? BulkImportId { get; set; }
 
+        [ForeignKey("BulkImportId")]
+        public WorkOrderBulkImport? BulkImport { get; set; }
         public int? MaintenanceScheduleId { get; set; }
         [ForeignKey("MaintenanceScheduleId")]
         public MaintenanceSchedule? MaintenanceSchedule { get; set; }

@@ -1,6 +1,7 @@
 ﻿using FactoryOpsApp.Application.Common;
 using FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.WorkOrderManagement;
+using FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.WorkOrderManagement;
 using Microsoft.AspNetCore.Mvc;
 using static FactoryOpsApp.Application.DTOs.WorkOrderCreateDto;
 
@@ -35,6 +36,17 @@ namespace FactoryOperation_Work_Order.Controllers.TenantAdminController.WorkOrde
             var result = await _service.CreateWorkOrderAsync(dto);
             return StatusCode(int.Parse(result.StatusCode), result);
         }
+
+        [HttpPost("bulk-import")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> ImportWorkOrders(
+      [FromForm] BulkWorkOrderImportRequest request)
+        {
+            var result = await _service.ImportBulkWorkOrdersAsync(request);
+            return Ok(result);
+        }
+
+
 
         /// <summary>
         /// Update work order

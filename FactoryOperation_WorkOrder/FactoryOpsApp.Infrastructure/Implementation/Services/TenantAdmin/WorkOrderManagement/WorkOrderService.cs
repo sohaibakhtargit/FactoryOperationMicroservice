@@ -17,6 +17,8 @@ namespace FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.WorkOr
             => _repository.GetWorkOrderAllAsync(tenantId, workOrderType);
         public Task<CommonResponseModel> CreateWorkOrderAsync(WorkOrderCreateDto dto)
                 => _repository.CreateWorkOrderAsync(dto);
+        public Task<BulkWorkOrderImportResult> ImportBulkWorkOrdersAsync(BulkWorkOrderImportRequest request)
+                => _repository.ImportBulkWorkOrdersAsync(request);
 
         public Task<GetSpecificRecord<WorkOrderDto>> GetWorkOrderByIdAsync(int WorkOrderId, int tenantId)
            => _repository.GetWorkOrderByIdAsync(WorkOrderId, tenantId);

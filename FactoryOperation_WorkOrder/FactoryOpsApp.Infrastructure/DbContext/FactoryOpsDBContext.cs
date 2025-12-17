@@ -1,4 +1,5 @@
-﻿using FactoryOpsApp.Domain.Entities;
+﻿using FactoryOperation_WorkOrder.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
+using FactoryOpsApp.Domain.Entities;
 using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,8 +17,13 @@ public class FactoryOpsDBContext : DbContext
     public DbSet<FactoryTeam> FactoryTeams { get; set; }
     public DbSet<Location> Locations { get; set; }
 
+    
+    public DbSet<AssetRegistry> AssetRegistry { get; set; }
+    public DbSet<AssetTracking> AssetTracking { get; set; }
+
     public DbSet<MaintenanceSchedule> MaintenanceSchedules { get; set; }
     public DbSet<WorkOrder> WorkOrders { get; set; }
+    public DbSet<WorkOrderBulkImport> WorkOrderBulkImports { get; set; }
     public DbSet<WorkOrderRequiredTool> WorkOrderRequiredTools { get; set; }
     public DbSet<MaintenanceTask> MaintenanceTasks { get; set; }
     public DbSet<WorkOrderSubTask> WorkOrderSubTasks { get; set; }

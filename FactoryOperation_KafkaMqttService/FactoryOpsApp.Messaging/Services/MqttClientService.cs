@@ -6,8 +6,6 @@ using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Protocol;
 using System.Collections.Concurrent;
-using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
 
 namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
 {
@@ -62,67 +60,15 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
             if (!string.IsNullOrEmpty(_settings.Username))
                 builder.WithCredentials(_settings.Username, _settings.Password);
 
-            // TLS / mTLS
             if (_settings.Tls?.Enable == true)
+                builder.WithTls();
+
+            if (_settings.Lwt != null)
             {
-                builder.WithTlsOptions(o =>
-                {
-                    // Enable TLS (method, not property)
-                    o.UseTls(true);
-
-                    // SSL protocol versions (method, not property assign)
-                    if (_settings.Tls.AllowedTlsVersions is { Length: > 0 })
-                    {
-                        o.WithSslProtocols(MapTlsVersions(_settings.Tls.AllowedTlsVersions));
-                    }
-
-                    // Client certificate (mTLS) optional
-                    if (_settings.Tls.UseMutualTls &&
-                        !string.IsNullOrEmpty(_settings.Tls.ClientCertPath) &&
-                        File.Exists(_settings.Tls.ClientCertPath))
-                    {
-                        try
-                        {
-                            var clientCert = new X509Certificate2(_settings.Tls.ClientCertPath);
-                            o.WithCertificates(new List<X509Certificate> { clientCert });
-                            // Enforce trusted certificates (do not allow untrusted)
-                            o.WithAllowUntrustedCertificates(false);
-                            // If you need custom validation, set a handler. Returning true accepts the server cert.
-                            o.WithCertificateValidationHandler(_ =>
-                            {
-                                // Keep strict by default; flip to true only when you fully manage trust chain.
-                                return true;
-                            });
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to load MQTT client certificate from {Path}", _settings.Tls.ClientCertPath);
-                        }
-                    }
-
-                    // CA/trust store: MQTTnet does not expose a direct TrustChain API across all platforms.
-                    // Typically, system trust store is used. If you must pin a CA, rely on CertificateValidationHandler above
-                    // and verify issuer/subject/thumbprint in that handler.
-                    // Example (optional, stricter):
-                    // o.WithCertificateValidationHandler(ctx =>
-                    // {
-                    //     var cert = ctx.Certificate;
-                    //     return cert?.Issuer?.Contains("Your CA") == true;
-                    // });
-                });
-            }
-
-            // Last Will and Testament
-            if (_settings.Lwt is not null)
-            {
-                var will = new MqttApplicationMessageBuilder()
-                    .WithTopic(_settings.Lwt.Topic)
-                    .WithPayload(_settings.Lwt.Payload ?? string.Empty)
-                    .WithQualityOfServiceLevel((MqttQualityOfServiceLevel)_settings.Lwt.Qos)
-                    .WithRetainFlag(_settings.Lwt.Retain)
-                    .Build();
-
-                builder.WithWillMessage(will);
+                builder.WithWillTopic(_settings.Lwt.Topic)
+                       .WithWillPayload(_settings.Lwt.Payload ?? string.Empty)
+                       .WithWillQualityOfServiceLevel((MqttQualityOfServiceLevel)_settings.Lwt.Qos)
+                       .WithWillRetain(_settings.Lwt.Retain);
             }
 
             _options = builder.Build();
@@ -577,40 +523,21 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
             return ti == tLevels.Length;
         }
 
-        private static SslProtocols MapTlsVersions(string[] versions)
+        private static string ParseHost(string brokerUrl)
         {
-            var p = SslProtocols.None;
-            foreach (var v in versions)
-            {
-                switch ((v ?? string.Empty).Trim().ToUpperInvariant())
-                {
-                    case "TLS12":
-                    case "TLS1.2":
-                        p |= SslProtocols.Tls12;
-                        break;
-                    case "TLS13":
-                    case "TLS1.3":
-                        p |= SslProtocols.Tls13;
-                        break;
-                }
-            }
-            return p == SslProtocols.None ? SslProtocols.Tls12 | SslProtocols.Tls13 : p;
-        }
+            if (string.IsNullOrWhiteSpace(brokerUrl))
+                return string.Empty;
 
-        private static string ParseHost(string url)
-        {
-            // keeps existing behavior; simple tcp://host:port or host string support
-            if (string.IsNullOrWhiteSpace(url)) return string.Empty;
-            if (url.Contains("://"))
+            if (brokerUrl.Contains("://"))
             {
-                try
-                {
-                    var u = new Uri(url);
-                    return string.IsNullOrWhiteSpace(u.Host) ? url : u.Host;
-                }
-                catch { return url; }
+                var idx = brokerUrl.IndexOf("://", StringComparison.Ordinal);
+                var host = brokerUrl[(idx + 3)..];
+                var slash = host.IndexOf('/');
+                if (slash >= 0) host = host[..slash];
+                return string.IsNullOrWhiteSpace(host) ? string.Empty : host;
             }
-            return url;
+
+            return brokerUrl;
         }
     }
 }
