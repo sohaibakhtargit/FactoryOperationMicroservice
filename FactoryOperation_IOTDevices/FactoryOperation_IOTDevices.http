@@ -1,0 +1,6 @@
+@FactoryOperation_IOTDevices_HostAddress = http://localhost:5046
+
+GET {{FactoryOperation_IOTDevices_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

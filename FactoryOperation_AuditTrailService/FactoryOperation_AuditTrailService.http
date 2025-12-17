@@ -1,0 +1,6 @@
+@FactoryOperation_AuditTrailService_HostAddress = http://localhost:5122
+
+GET {{FactoryOperation_AuditTrailService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

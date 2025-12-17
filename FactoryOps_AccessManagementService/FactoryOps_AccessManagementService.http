@@ -1,0 +1,6 @@
+@FactoryOps_AccessManagementService_HostAddress = http://localhost:5130
+
+GET {{FactoryOps_AccessManagementService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

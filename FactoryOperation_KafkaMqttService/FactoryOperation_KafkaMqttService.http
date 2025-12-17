@@ -1,0 +1,6 @@
+@FactoryOperation_KafkaMqttService_HostAddress = http://localhost:5124
+
+GET {{FactoryOperation_KafkaMqttService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

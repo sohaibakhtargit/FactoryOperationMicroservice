@@ -1,0 +1,6 @@
+@FactoryOperation_API_Gateway_HostAddress = http://localhost:5202
+
+GET {{FactoryOperation_API_Gateway_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
