@@ -1,0 +1,2 @@
+2026-02-03T09:56:28.2326094Z | Correlation=adb0ad73-960c-4d0e-bafd-2e4de3f2cad8 | Tenant=1 | Service=NotificationConsumerWorker | Stage=CONSUME_RECEIVED | Topic=factoryops.createworkorderasync.1.created | Partition=0 | Offset=6 | Status=SUCCESS | Message=Kafka message received
+2026-02-03T09:57:14.8115341Z | Correlation=adb0ad73-960c-4d0e-bafd-2e4de3f2cad8 | Tenant=1 | Service=NotificationConsumerWorker | Stage=PROCESSING_STARTED | Topic=factoryops.createworkorderasync.1.created | Partition=0 | Offset=6 | Status=SUCCESS | Message=Processing started

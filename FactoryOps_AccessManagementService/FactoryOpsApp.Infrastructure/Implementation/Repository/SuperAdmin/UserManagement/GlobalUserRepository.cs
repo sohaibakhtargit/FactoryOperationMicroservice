@@ -245,7 +245,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 try
                 {
-                    // ====== 1️⃣ Validate user existence ======
+                   
                     var existingUser = await tenantDb.FactoryUsers
                         .FirstOrDefaultAsync(u => u.UserId == dto.UserId && !u.IsDeleted);
 
@@ -258,7 +258,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                     var oldEmail = existingUser.Email;
 
-                    // ====== 2️⃣ Validate new email ======
+                    
                     if (!string.Equals(oldEmail, dto.Email, StringComparison.OrdinalIgnoreCase))
                     {
                         bool emailExistsInFactory = await tenantDb.FactoryUsers
@@ -282,7 +282,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         }
                     }
 
-                    // ====== 3️⃣ Fetch global user using old email ======
+                   
                     var globalUser = await _masterDbcontext.GlobalUsers
                         .FirstOrDefaultAsync(g => g.TenantId == dto.TenantId && g.Email == oldEmail && !g.IsDeleted);
                     string? relativePath = null;
@@ -304,7 +304,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                     await tenantDb.SaveChangesAsync();
 
-                    // ====== 6️⃣ Update GlobalUser ======
+                   
                     if (globalUser != null)
                     {
                         globalUser.Email = dto.Email;
@@ -313,7 +313,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         await _masterDbcontext.SaveChangesAsync();
                     }
 
-                    // ====== 7️⃣ Commit both transactions ======
+                    
                     await tenantTransaction.CommitAsync();
                     await masterTransaction.CommitAsync();
 
@@ -586,7 +586,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 await _masterDbcontext.SaveChangesAsync();
 
-                // Audit log
+                
                 await _auditLogger.LogAuditAsync(
                     "Update",
                     $"Profile for Tenant '{factoryTenantUser.TenantId}' updated with {(imageBytes != null ? "an image" : "no image")}.",

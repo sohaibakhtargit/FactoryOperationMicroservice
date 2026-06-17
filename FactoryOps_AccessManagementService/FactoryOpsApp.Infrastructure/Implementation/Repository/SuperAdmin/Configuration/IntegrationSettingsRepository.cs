@@ -117,7 +117,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             var response = new GetAllRecord<IntegrationSettingsDto>();
             try
             {
-                using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId); // tenantId to be passed if multi-tenant
+                using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId); 
 
                 var data = await tenantDb.IntegrationSettings
                     .Where(x => x.Category == category && x.TenantId == tenantId && !x.IsDeleted)

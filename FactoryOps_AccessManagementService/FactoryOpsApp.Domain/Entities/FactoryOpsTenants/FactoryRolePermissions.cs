@@ -12,6 +12,7 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
     public class FactoryRolePermissions
     {
         [Key]
+        public int RolePermissionId { get; set; }
         public int RoleId { get; set; }
         [Required]
         public int TenantId { get; set; }

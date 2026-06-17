@@ -60,6 +60,7 @@ namespace FactoryOpsApp.Application.DTOs
         public bool IsActive { get; set; }
         public string YearsInService { get; set; } = string.Empty;
         public string RetirementTimespan { get; set; } = string.Empty;
+        public List<AssetLifecycleStageEnum> LifecycleStages { get; set; } = new List<AssetLifecycleStageEnum>();
     }
 
     public class AssetFinancialAnalysisDto
@@ -105,4 +106,31 @@ namespace FactoryOpsApp.Application.DTOs
         public int AssetsInOperation { get; set; }
         public int AssetsNeedingReplacement { get; set; }
     }
+
+    public class AssetLifecycleFinancialSummaryDTO
+    {
+        public decimal TotalAssetValue { get; set; }
+     //   public decimal AssetValueChangePercent { get; set; }
+
+        public decimal TotalTCO { get; set; }
+      //  public decimal TcoChangePercent { get; set; }
+
+        public decimal AverageROI { get; set; }
+    //    public decimal RoiChangePercent { get; set; }
+
+        public int DueForReplacementCount { get; set; }
+    }
+    public class AssetLifeHistoryReportDTO
+    {
+        public int TenantId { get; set; }
+        public int AssetId { get; set; }
+        public string AssetName { get; set; } = string.Empty;
+        public WorkOrderStatus? Status { get; set; }
+        public int WorkOrderId { get; set; }
+        public string WorkOrderName { get; set; } = string.Empty;
+        public decimal? LaborCost { get; set; }
+        public decimal? PartCost { get; set; }
+        public decimal? TotalCost { get; set; }
+    }
+
 }

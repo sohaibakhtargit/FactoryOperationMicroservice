@@ -31,7 +31,7 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
             {
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
 
-                // Generate unique transaction ID
+               
                 var transactionId = GenerateTransactionId(dto.TransactionType);
 
                 var entity = new InventoryTransaction
@@ -57,7 +57,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
                 await tenantDb.InventoryTransaction.AddAsync(entity);
                 await tenantDb.SaveChangesAsync();
 
-                // Update inventory stock based on transaction type
                 await UpdateInventoryStock(dto, tenantDb);
 
                 await _auditLogger.LogAuditAsync("Create", $"Created {dto.TransactionType} Transaction: {transactionId}", dto.TenantId, "", "CreateTransactionAsync");
@@ -106,7 +105,7 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
                         inventoryItem.QuantityAvailable -= dto.Quantity;
                         break;
                     case TransactionType.Transfer:
-                        // Transfer logic - deduct from source, add to destination
+                        
                         break;
                     case TransactionType.Adjustment:
                         inventoryItem.QuantityAvailable = dto.Quantity;

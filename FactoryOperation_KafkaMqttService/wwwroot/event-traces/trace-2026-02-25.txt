@@ -1,0 +1,1 @@
+2026-02-25T06:48:22.3730029Z | Correlation=07cf280c14ad444488595ce47f005bd5 | Tenant=1 | Service=KafkaProducerService | Stage=PRODUCE_REQUESTED | Topic=factoryops.1.devices.Dev001.telemetry | Partition=N/A | Offset=N/A | Status=SUCCESS | Message=Kafka produce requested

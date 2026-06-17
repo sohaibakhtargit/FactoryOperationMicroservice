@@ -11,5 +11,6 @@ namespace FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.AssetMan
     public interface IAssetDashboardReportRepository
     {
         Task<GetAllRecord<DashboardSummaryDto>> GetDashboardSummaryAsync(int tenantId);
+        Task<GetAllRecord<DashboardDataDto>> FetchDashboardDataAsync(int tenantId);
     }
 }

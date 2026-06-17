@@ -27,7 +27,6 @@ public class PointAssignmentDto
     public int BonusPoints { get; set; } = 0;
     public int TotalPoints { get; set; } = 0;
 
-    // Change to enum
     public PointAssignmentStatus Status { get; set; } = PointAssignmentStatus.Pending;
 
     public DateTime? CompletionDate { get; set; }

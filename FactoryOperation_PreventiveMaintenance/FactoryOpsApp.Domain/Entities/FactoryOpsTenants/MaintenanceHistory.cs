@@ -56,6 +56,10 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public decimal? MTBF { get; set; }
         public decimal? MTTR { get; set; }
 
+        public DateTime? FailureReportedOn { get; set; }   
+        public DateTime? RepairCompletedOn { get; set; }  
+
+
         // Audit Fields
         public bool IsActive { get; set; } = true;
         public bool IsDeleted { get; set; } = false;

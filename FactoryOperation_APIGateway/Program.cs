@@ -13,7 +13,6 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 var envMode = builder.Configuration.GetValue<string>("EnvironmentMode");
 
-// Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -26,28 +25,22 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Configure JWT settings
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 
-// Register services with correct lifetimes
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// Add HttpClient with resilience
 builder.Services.AddHttpClient<IAuthService, AuthService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
-// Add YARP Reverse Proxy
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
-// Configure JWT Authentication - FIXED: Don't resolve scoped services here
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        // Get configuration directly, don't resolve JwtService
         var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
 
         if (jwtSettings == null)
@@ -64,16 +57,33 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidAudience = jwtSettings.Audience,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.FromMinutes(1)
         };
+
 
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrEmpty(token) &&
+                    (path.StartsWithSegments("/notificationHub") ||
+                     path.StartsWithSegments("/notification")))
+                {
+                    context.Token = token;
+                }
+                return Task.CompletedTask;
+            },
+
             OnAuthenticationFailed = context =>
             {
                 Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+                Console.WriteLine($"Path: {context.Request.Path}"); 
                 return Task.CompletedTask;
             },
+
             OnTokenValidated = context =>
             {
                 Console.WriteLine($"Token validated for: {context.Principal?.Identity?.Name}");
@@ -82,34 +92,46 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-//builder.Services.AddSignalR();
-
 builder.Services.AddDbContext<FactoryOpsDBContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("TenantDbConnection")));
 
 builder.Services.AddDbContext<MasterFactoryOpsDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("MasterDbConnection")));
 
-// Register the factory used by WorkOrderRepository
 builder.Services.AddScoped<TenantDbContextFactory>();
-
 
 builder.Services.AddScoped<IExceptionLoggerService, ExceptionLoggerService>();
 
 builder.Services.AddAuthorization();
 
+// ✅ ADD: SignalR configuration for proxying
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
+    options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+});
+
 // Add logging
 builder.Services.AddLogging();
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CorsPolicy", builder =>
-        builder
-        .SetIsOriginAllowed(_ => true)
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials()
-        );
+    options.AddPolicy("CorsPolicy", policy =>
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "https://ms.stagingsdei.com:8108",
+                "https://ms.stagingsdei.com:8118",
+                "https://ms.stagingsdei.com:8123"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()
+    );
 });
+
 
 
 var app = builder.Build();
@@ -117,12 +139,17 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 
 
-// ======================= Swagger =======================
+
 if (envMode == "Local" || envMode == "Staging")
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseWebSockets(new WebSocketOptions
+{
+    KeepAliveInterval = TimeSpan.FromSeconds(15)
+});
 
 app.UseCors("CorsPolicy");
 app.UseHttpsRedirection();

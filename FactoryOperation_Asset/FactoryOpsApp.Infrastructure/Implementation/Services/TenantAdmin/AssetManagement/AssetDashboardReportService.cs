@@ -15,5 +15,8 @@ namespace FactoryOpsApp.Infrastructure.Service.TenantAdmin.AssetManagement
 
         public Task<GetAllRecord<DashboardSummaryDto>> GetDashboardSummaryAsync(int tenantId)
             => _repository.GetDashboardSummaryAsync(tenantId);
+
+        public Task<GetAllRecord<DashboardDataDto>> FetchDashboardDataAsync(int tenantId)
+            => _repository.FetchDashboardDataAsync(tenantId);
     }
 }

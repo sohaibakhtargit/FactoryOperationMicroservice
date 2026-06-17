@@ -32,7 +32,7 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
                     TargetTeamId = n.TargetTeamId,
                     IsRead = n.IsRead,
                     CreatedAt = n.CreatedAt,
-                    AdditionalData = n.AdditionalData.ToString()
+                    AdditionalData = n.AdditionalData!.ToString()
                 })
                 .ToListAsync();
 
@@ -56,7 +56,7 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
                     TargetTeamId = n.TargetTeamId,
                     IsRead = n.IsRead,
                     CreatedAt = n.CreatedAt,
-                    AdditionalData = n.AdditionalData.ToString()
+                    AdditionalData = n.AdditionalData!.ToString()
                 })
                 .ToListAsync();
 
@@ -85,8 +85,10 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
         public async Task<List<NotificationDto>> GetUserNotificationsAsync(int tenantId, int userId)
         {
             using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+
             return await tenantDb.MasterNotifications
-                .Where(n => n.TargetUserId == userId || n.CreatedByUserId == userId)
+                .Where(n => n.TenantId == tenantId &&
+                            (n.TargetUserId == userId || n.CreatedByUserId == userId))
                 .OrderByDescending(n => n.CreatedAt)
                 .Select(n => new NotificationDto
                 {

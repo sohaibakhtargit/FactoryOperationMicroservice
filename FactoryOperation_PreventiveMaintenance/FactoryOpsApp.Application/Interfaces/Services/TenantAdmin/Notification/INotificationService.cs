@@ -16,10 +16,8 @@ namespace FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Notification
         Task NotifyUser(int userId, WorkOrderNotificationDto notification);
         Task NotifyTenant(int tenantId, WorkOrderNotificationDto notification);
 
-        //Assigneee Notification
         Task NotifyWorkOrderAssignmentAsync(WorkOrderNotificationDto notification);
 
-        //Notification-LowStockAsync
         Task NotifyLowStockAsync(InventoryNotificationDto notification);
     }
 }

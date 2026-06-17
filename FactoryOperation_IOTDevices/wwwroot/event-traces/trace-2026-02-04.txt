@@ -1,0 +1,2 @@
+2026-02-04T12:27:27.4002178Z | Correlation=17b53392-aaf8-4200-95e4-3fd4618eecae | Tenant=1 | Service=KafkaTelemetryConsumer | Stage=CONSUME_RECEIVED | Topic=factoryops.createworkorderasync.1.created | Partition=0 | Offset=0 | Status=SUCCESS | Message=Telemetry message received
+2026-02-04T12:27:27.7978514Z | Correlation=17b53392-aaf8-4200-95e4-3fd4618eecae | Tenant=1 | Service=KafkaTelemetryConsumer | Stage=PROCESSED | Topic=factoryops.createworkorderasync.1.created | Partition=0 | Offset=0 | Status=SUCCESS | Message=Telemetry processed successfully

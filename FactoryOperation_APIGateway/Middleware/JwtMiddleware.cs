@@ -1,5 +1,5 @@
 ﻿using FactoryOperation_API_Gateway.FactoryOpsApp.Infrastructure.Services.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Authorization;
 using System.Text.Json;
 
 namespace FactoryOperation_API_Gateway.Middleware
@@ -15,24 +15,23 @@ namespace FactoryOperation_API_Gateway.Middleware
 
         public async Task Invoke(HttpContext context)
         {
-            // Resolve scoped service per-request
-            var jwtService = context.RequestServices.GetRequiredService<IJwtService>();
-
-            // Skip authentication for public paths
-            if (IsPublicPath(context.Request.Path))
+            // 🔥 IMPORTANT: Respect [AllowAnonymous]
+            var endpoint = context.GetEndpoint();
+            if (endpoint?.Metadata?.GetMetadata<IAllowAnonymous>() != null)
             {
                 await _next(context);
                 return;
             }
 
+            var jwtService = context.RequestServices.GetRequiredService<IJwtService>();
             var token = ExtractToken(context.Request);
 
             if (!string.IsNullOrEmpty(token))
             {
                 var user = jwtService.ExtractUserFromToken(token);
+
                 if (user != null)
                 {
-                    // Add user info to context for routing and authorization
                     context.Items["UserId"] = user.UserId;
                     context.Items["TenantId"] = user.TenantId;
                     context.Items["RoleType"] = user.RoleType;
@@ -45,31 +44,11 @@ namespace FactoryOperation_API_Gateway.Middleware
                 }
             }
 
-            // Token is invalid or missing
             await ReturnUnauthorized(context, "Invalid or missing token");
-        }
-
-        private bool IsPublicPath(PathString path)
-        {
-            var publicPaths = new[]
-            {
-                "/auth/login",
-                "/auth/forget-password",
-                "/auth/validate", // allow validate to reach controller
-                "/api/authenticate/authenticate",
-                "/api/authenticate/Forget-Password",
-                "/swagger",
-                "/favicon.ico",
-                "/api/gateway/status",
-                "/api/gateway/health"
-            };
-
-            return publicPaths.Any(p => path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase));
         }
 
         private string? ExtractToken(HttpRequest request)
         {
-            // Try to get token from Authorization header
             if (request.Headers.TryGetValue("Authorization", out var authHeader))
             {
                 var headerValue = authHeader.ToString();
@@ -79,7 +58,6 @@ namespace FactoryOperation_API_Gateway.Middleware
                 }
             }
 
-            // Try to get token from query string
             if (request.Query.TryGetValue("access_token", out var queryToken))
             {
                 return queryToken;
@@ -92,6 +70,7 @@ namespace FactoryOperation_API_Gateway.Middleware
         {
             context.Response.StatusCode = 401;
             context.Response.ContentType = "application/json";
+
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
             {
                 error = message,

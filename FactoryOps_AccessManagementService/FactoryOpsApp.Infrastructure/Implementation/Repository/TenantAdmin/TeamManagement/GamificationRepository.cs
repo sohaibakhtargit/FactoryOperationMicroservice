@@ -26,26 +26,26 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             {
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
 
-                // Get user's total points from point assignments - using enum
+                
                 var totalPoints = await tenantDb.PointAssignments
                     .Where(pa => pa.AssignedToUserId == userId && pa.Status == PointAssignmentStatus.Completed)
                     .SumAsync(pa => pa.TotalPoints);
 
-                // Calculate level based on points (100 points per level)
+                
                 var level = totalPoints / 100 + 1;
                 var pointsToNextLevel = level * 100 - totalPoints;
 
-                // Get completed tasks count - using enum
+                
                 var completedTasks = await tenantDb.PointAssignments
                     .CountAsync(pa => pa.AssignedToUserId == userId && pa.Status == PointAssignmentStatus.Completed);
 
-                // Get recent achievements
+                
                 var recentAchievements = await GetRecentAchievementsAsync(userId, tenantDb);
 
-                // Get active challenges
+                
                 var activeChallenges = await GetActiveChallengesAsync(userId, tenantDb);
 
-                // Get leaderboard
+                
                 var leaderboard = await GetLeaderboardDataAsync(tenantDb, 10);
 
                 var dashboard = new GamificationDashboardDto
@@ -57,7 +57,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     OnTimeCompletionRate = await CalculateOnTimeCompletionRateAsync(userId, tenantDb),
                     CurrentStreakDays = await CalculateCurrentStreakAsync(userId, tenantDb),
                     UnlockedAchievements = recentAchievements.Count(a => a.IsEarned),
-                    TotalAchievements = 20, // Total available achievements
+                    TotalAchievements = 20, 
                     RecentAchievements = recentAchievements,
                     ActiveChallenges = activeChallenges,
                     Leaderboard = leaderboard
@@ -99,7 +99,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 IsEarned = ub.IsAwarded
             }).ToList();
 
-            // Add some locked achievements for demonstration
+            
             if (achievements.Count < 5)
             {
                 var availableBadges = await tenantDb.Badges
@@ -121,7 +121,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
         private async Task<List<ChallengeProgressDto>> GetActiveChallengesAsync(int userId, FactoryOpsDBContext tenantDb)
         {
-            // Assuming you have a ChallengeStatus enum, if not you might need to create one
+            
             // For now, using integer 1 for active status as in your original code
             var activeChallenges = await tenantDb.Challenges
                 .Where(c => c.IsActive &&
@@ -135,17 +135,17 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 Title = c.Title,
                 Description = c.Description,
                 CurrentProgress = CalculateChallengeProgress(c, userId),
-                Target = 100, // Default target
+                Target = 100, 
                 Reward = c.Reward
             }).ToList();
         }
 
         private int CalculateChallengeProgress(Challenge challenge, int userId)
         {
-            // Simple progress calculation based on participant IDs
+            
             if (challenge.ParticipantIds != null && challenge.ParticipantIds.Contains(userId))
             {
-                return 50; // 50% progress for participants
+                return 50;
             }
             return 0;
         }
@@ -153,7 +153,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         private async Task<List<LeaderboardEntryDto>> GetLeaderboardDataAsync(FactoryOpsDBContext tenantDb, int topCount)
         {
             var leaderboardData = await tenantDb.PointAssignments
-                .Where(pa => pa.Status == PointAssignmentStatus.Completed) // Using enum
+                .Where(pa => pa.Status == PointAssignmentStatus.Completed) 
                 .GroupBy(pa => pa.AssignedToUserId)
                 .Select(g => new
                 {
@@ -189,7 +189,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         {
             var completedTasks = await tenantDb.PointAssignments
                 .Where(pa => pa.AssignedToUserId == userId &&
-                           pa.Status == PointAssignmentStatus.Completed && // Using enum
+                           pa.Status == PointAssignmentStatus.Completed && 
                            pa.CompletionDate.HasValue)
                 .ToListAsync();
 
@@ -207,7 +207,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         {
             var recentCompletions = await tenantDb.PointAssignments
                 .Where(pa => pa.AssignedToUserId == userId &&
-                             pa.Status == PointAssignmentStatus.Completed && // Using enum
+                             pa.Status == PointAssignmentStatus.Completed &&
                              pa.CompletionDate.HasValue)
                 .OrderByDescending(pa => pa.CompletionDate)
                 .Select(pa => pa.CompletionDate.Value.Date)
@@ -281,7 +281,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             {
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
 
-                // Assuming you have a ChallengeStatus enum, if not you might need to create one
+                
                 var activeChallenges = await tenantDb.Challenges
                     .Where(c => c.IsActive &&
                                c.StartDate <= DateTime.UtcNow &&
@@ -348,7 +348,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
 
                 var totalPoints = await tenantDb.PointAssignments
-                    .Where(pa => pa.AssignedToUserId == userId && pa.Status == PointAssignmentStatus.Completed) // Using enum
+                    .Where(pa => pa.AssignedToUserId == userId && pa.Status == PointAssignmentStatus.Completed) 
                     .SumAsync(pa => pa.TotalPoints);
 
                 var level = totalPoints / 100 + 1;
@@ -358,7 +358,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 var tasksThisMonth = await tenantDb.PointAssignments
                     .CountAsync(pa => pa.AssignedToUserId == userId &&
-                                      pa.Status == PointAssignmentStatus.Completed && // Using enum
+                                      pa.Status == PointAssignmentStatus.Completed && 
                                       pa.CompletionDate.HasValue &&
                                       pa.CompletionDate.Value.Month == currentMonth &&
                                       pa.CompletionDate.Value.Year == currentYear);
@@ -397,11 +397,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         private async Task<int> CalculateUserRankAsync(int userId, FactoryOpsDBContext tenantDb)
         {
             var userPoints = await tenantDb.PointAssignments
-                .Where(pa => pa.AssignedToUserId == userId && pa.Status == PointAssignmentStatus.Completed) // Using enum
+                .Where(pa => pa.AssignedToUserId == userId && pa.Status == PointAssignmentStatus.Completed) 
                 .SumAsync(pa => pa.TotalPoints);
 
             var usersWithMorePoints = await tenantDb.PointAssignments
-                .Where(pa => pa.Status == PointAssignmentStatus.Completed) // Using enum
+                .Where(pa => pa.Status == PointAssignmentStatus.Completed) 
                 .GroupBy(pa => pa.AssignedToUserId)
                 .Where(g => g.Sum(pa => pa.TotalPoints) > userPoints)
                 .CountAsync();

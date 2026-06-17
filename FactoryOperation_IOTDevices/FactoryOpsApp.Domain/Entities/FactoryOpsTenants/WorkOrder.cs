@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using FactoryOperation_IOTDevices.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
@@ -76,6 +77,7 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public ICollection<MaintenanceTask> Tasks { get; set; }
         public ICollection<WorkOrderSubTask> WorkOrderSubTasks { get; set; }
         public ICollection<WorkOrderRequiredTool>? RequiredTools { get; set; }
+        public ICollection<WorkOrderProgressUpdates> WorkOrderProgressUpdates { get; set; }
 
 
 
@@ -90,9 +92,11 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public DateTime? PauseTime { get; set; }
         public bool IsStarted { get; set; } = false;
         public bool IsPaused { get; set; } = false;
+        public bool IsReminderSent { get; set; } = false;
         public Decimal TotalTime { get; set; } = 0;
         //public string WorkProgressStatus { get; set; }
-
+        public DateTime? CompletedAt { get; set; }
+        public bool IsApprovalReminderSent { get; set; }
 
     }
     public enum UpdateTypeEnum

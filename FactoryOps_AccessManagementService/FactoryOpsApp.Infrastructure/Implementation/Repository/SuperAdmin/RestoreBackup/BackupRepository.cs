@@ -2,10 +2,12 @@
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.SuperAdmin.AuditLogs;
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.ExceptionLogger;
 using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Common;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Domain.Entities.MasterTenantsAdmin;
 using FactoryOpsApp.Infrastructure.DBContext;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Text;
 using static FactoryOps_AccessManagementService.FactoryOpsApp.Common.CommonConstant;
@@ -19,18 +21,20 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _env;
         private readonly IAuditLogService _auditLogger;
-
+        private readonly BackupSettings _backupSettings;
         public BackupRepository(MasterFactoryOpsDbContext masterDbContext,
             IExceptionLoggerService exceptionLogger,
             IConfiguration configuration,
             IWebHostEnvironment env,
-            IAuditLogService auditLogger)
+            IAuditLogService auditLogger,
+            IOptions<BackupSettings> backupSettings)
         {
             _masterDbContext = masterDbContext;
             _exceptionLogger = exceptionLogger;
             _configuration = configuration;
             _env = env;
             _auditLogger = auditLogger;
+            _backupSettings = backupSettings.Value;
         }
 
         public async Task<CommonResponseModel> CreateTenantBackupAsync(BackupRequestDto request)
@@ -48,22 +52,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 string databaseName = tenantDb.DbName;
 
-                //local
-
-                //string user = _configuration["BackupSettings:PostgresUser"];
-                //string password = _configuration["BackupSettings:PostgresPassword"];
-                //string port = _configuration["BackupSettings:PostgresPort"];
-                //string host = _configuration["BackupSettings:PostgresHost"];
-                //string pgDumpPath = _configuration["BackupSettings:PgDumpPath"];
-                //string backupDirectory = Path.Combine(_env.WebRootPath, "backups");
-
-
-                //staging
-                string user = _configuration["BackupSettingsStaging:PostgresUser"];
-                string password = _configuration["BackupSettingsStaging:PostgresPassword"];
-                string port = _configuration["BackupSettingsStaging:PostgresPort"];
-                string host = _configuration["BackupSettingsStaging:PostgresHost"];
-                string pgDumpPath = _configuration["BackupSettingsStaging:PgDumpPath"];
+                string user = _backupSettings.PostgresUser;
+                string password = _backupSettings.PostgresPassword;
+                string port = _backupSettings.PostgresPort;
+                string host = _backupSettings.PostgresHost;
+                string pgDumpPath = _backupSettings.PgDumpPath;
                 string backupDirectory = Path.Combine(_env.WebRootPath, "Db_Backups");
 
                 if (!Directory.Exists(backupDirectory))
@@ -85,7 +78,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 psi.Environment["PGPASSWORD"] = password;
 
                 using var process = Process.Start(psi);
-                var error = await process.StandardError.ReadToEndAsync();
+                var error = await process!.StandardError.ReadToEndAsync();
                 var output = await process.StandardOutput.ReadToEndAsync();
                 process.WaitForExit();
 
@@ -154,12 +147,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 string databaseName = "MasterFactoryOperation";
 
-                //staging
-                string user = _configuration["BackupSettingsStaging:PostgresUser"];
-                string password = _configuration["BackupSettingsStaging:PostgresPassword"];
-                string port = _configuration["BackupSettingsStaging:PostgresPort"];
-                string host = _configuration["BackupSettingsStaging:PostgresHost"];
-                string pgDumpPath = _configuration["BackupSettingsStaging:PgDumpPath"];
+                string user = _backupSettings.PostgresUser;
+                string password = _backupSettings.PostgresPassword;
+                string port = _backupSettings.PostgresPort;
+                string host = _backupSettings.PostgresHost;
+                string pgDumpPath = _backupSettings.PgDumpPath;
                 string backupDirectory = Path.Combine(_env.WebRootPath, "Db_Backups");
 
                 if (!Directory.Exists(backupDirectory))
@@ -181,7 +173,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 psi.Environment["PGPASSWORD"] = password;
 
                 using var process = Process.Start(psi);
-                var error = await process.StandardError.ReadToEndAsync();
+                var error = await process!.StandardError.ReadToEndAsync();
                 var output = await process.StandardOutput.ReadToEndAsync();
                 process.WaitForExit();
 
@@ -297,7 +289,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     CompressBackup = x.CompressBackup,
                     BackupStatus = x.BackupStatus,
 
-                    // Convert relative path to full URL
+                   
                     BackupPath = !string.IsNullOrEmpty(x.BackupPath)
                                     ? $"{baseUrl}{(x.BackupPath.StartsWith("/") ? "" : "/")}{x.BackupPath.Replace("\\", "/")}"
                                     : null,
@@ -343,7 +335,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     .ToListAsync();
 
                 dto.TotalBackups = backups.Count;
-                dto.TotalStorageUsedGB = 12.8;//backups.Sum(b => b.BackupSizeGB);
+                dto.TotalStorageUsedGB = 12.8;
                 dto.AverageBackupSizeGB = Math.Round(backups.Average(b => b.BackupSizeGB) ?? 0, 10);
 
                 dto.TenantsCovered = backups.Select(b => b.TenantId).Distinct().Count();
@@ -388,20 +380,12 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     throw new Exception("Tenant DB not found");
 
                 string databaseName = tenantDb.DbName;
-                //local config
 
-                //string user = _configuration["BackupSettings:PostgresUser"];
-                //string password = _configuration["BackupSettings:PostgresPassword"];
-                //string port = _configuration["BackupSettings:PostgresPort"];
-                //string host = _configuration["BackupSettings:PostgresHost"];
-                //string pgRestorePath = _configuration["BackupSettings:PgRestorePath"];
-                //string backupDirectory = Path.Combine(_env.WebRootPath, "backups");
-
-                string user = _configuration["BackupSettingsStaging:PostgresUser"];
-                string password = _configuration["BackupSettingsStaging:PostgresPassword"];
-                string port = _configuration["BackupSettingsStaging:PostgresPort"];
-                string host = _configuration["BackupSettingsStaging:PostgresHost"];
-                string pgRestorePath = _configuration["BackupSettingsStaging:PgRestorePath"];
+                string user = _backupSettings.PostgresUser;
+                string password = _backupSettings.PostgresPassword;
+                string port = _backupSettings.PostgresPort;
+                string host = _backupSettings.PostgresHost;
+                string pgRestorePath = _backupSettings.PgRestorePath;
                 string backupDirectory = Path.Combine(_env.WebRootPath, "backups");
 
                 string backupFilePath = Path.Combine(backupDirectory, request.BackupFileName);

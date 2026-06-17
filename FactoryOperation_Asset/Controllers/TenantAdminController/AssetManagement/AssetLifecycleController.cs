@@ -130,6 +130,21 @@ namespace FactoryOpsApp.API.Controllers.TenantAdminContoller.AssetManagement
             var result = await _assetLifecycleService.GetAssetLifecycleMetricsAsync(tenantId);
             return Ok(result);
         }
+
+        [HttpGet("Get-AssetLifeSummery")]
+        public async Task<IActionResult> GetAssetLifeCycleSummery(int tenantId)
+        {
+            var result = await _assetLifecycleService.GetAssetLifeCycleSummery(tenantId);
+            return Ok(result);
+        }
+
+        [HttpGet("GetAssetLifeHistoryReport")]
+        public async Task<IActionResult> GetAssetLifeHistoryReport(int tenantId, int assetId)
+        {
+            var result = await _assetLifecycleService.GetAssetLifeHistoryReport(tenantId, assetId);
+            return Ok(result);
+        }
+
     }
 
     /// <summary>

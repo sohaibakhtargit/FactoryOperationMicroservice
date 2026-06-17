@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FactoryOperation_Asset.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -62,9 +63,6 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public string? DocumentFile { get; set; }
         public string? InsurancePolicyNumber { get; set; }
 
-
-
-        // Audit Fields
         public bool IsActive { get; set; } = true;
         public bool IsDeleted { get; set; } = false;
         public int? CreatedBy { get; set; }
@@ -74,6 +72,11 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        public int? BulkImportId { get; set; }
+
+        [ForeignKey("BulkImportId")]
+        public AssetBulkImport? BulkImport { get; set; }
+
         // Navigation collections
         public ICollection<AssetTracking> AssetTracking { get; set; }
         public ICollection<MaintenanceHistory> MaintenanceHistory { get; set; }
@@ -81,5 +84,7 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public ICollection<AssetDocuments> AssetDocuments { get; set; }
         public ICollection<AssetFinancialAnalysis> AssetFinancialAnalysis { get; set; }
         public ICollection<AssetDashboard_Report> AssetDashboard_Reports { get; set; }
+        public ICollection<AssetBillOfMaterials> BillOfMaterials { get; set; }
+
     }
 }

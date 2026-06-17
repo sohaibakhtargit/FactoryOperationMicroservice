@@ -106,4 +106,13 @@ namespace FactoryOpsApp.Application.DTOs
         public DashboardMetricsDto Metrics { get; set; }
         public AssetDashboardReportDto DowntimeMetrics { get; set; }
     }
+    public class DashboardDataDto
+    {
+        public int TenantId { get; set; }
+        public int LowCriticaAssetsCount { get; set; }
+        public int HighCriticalAssetsCount { get; set; }
+        public int MediumCriticalAssetsCount { get; set; }
+        public int TotalActiveWorkOrder { get; set; }
+        public int totalActiveTechnicians { get; set; }
+    }
 }

@@ -1,0 +1,2 @@
+2026-02-03T09:56:23.1779681Z | Correlation=adb0ad73-960c-4d0e-bafd-2e4de3f2cad8 | Tenant=1 | Service=KafkaProducerService | Stage=PRODUCE_REQUESTED | Topic=factoryops.createworkorderasync.1.created | Partition=N/A | Offset=N/A | Status=SUCCESS | Message=Kafka produce requested
+2026-02-03T09:56:27.1361871Z | Correlation=adb0ad73-960c-4d0e-bafd-2e4de3f2cad8 | Tenant=1 | Service=KafkaProducerService | Stage=PRODUCED | Topic=factoryops.createworkorderasync.1.created | Partition=0 | Offset=6 | Status=SUCCESS | Message=Kafka message delivered

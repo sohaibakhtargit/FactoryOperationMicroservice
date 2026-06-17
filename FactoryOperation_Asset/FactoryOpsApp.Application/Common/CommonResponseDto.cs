@@ -26,6 +26,10 @@ namespace FactoryOpsApp.Application.Common
     {
         public List<T> GetAllData { get; set; } = new List<T>();
     }
+    public class GetAllRecordsCount<T> : CountResponseModel
+    {
+        public List<T> GetAllData { get; set; } = new List<T>();
+    }
     public class CountResponseModel
     {
         public string StatusCode { get; set; }

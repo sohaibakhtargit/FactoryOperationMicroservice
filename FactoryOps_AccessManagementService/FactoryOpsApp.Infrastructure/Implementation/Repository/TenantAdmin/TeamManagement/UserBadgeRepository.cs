@@ -31,7 +31,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             {
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
 
-                // Check if user already has this badge
+               
                 var existing = await tenantDb.UserBadges
                     .FirstOrDefaultAsync(ub => ub.BadgeId == dto.BadgeId &&
                                              ub.UserId == dto.UserId &&
@@ -215,7 +215,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     BadgeName = ub.Badge.Name,
                     BadgeDescription = ub.Badge.Description,
                     //   BadgeType = ub.Badge.BadgeType,
-                    UserName = "User Name", // You'll need to join with Users table
+                    UserName = "User Name", 
                     CreatedAt = ub.CreatedAt
                 }).ToList();
 
@@ -266,7 +266,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     BadgeName = entity.Badge.Name,
                     BadgeDescription = entity.Badge.Description,
                     //   BadgeType = entity.Badge.BadgeType,
-                    UserName = "User Name", // You'll need to join with Users table
+                    UserName = "User Name", 
                     CreatedAt = entity.CreatedAt
                 };
 
@@ -312,7 +312,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     BadgeName = ub.Badge.Name,
                     BadgeDescription = ub.Badge.Description,
                     //   BadgeType = ub.Badge.BadgeType,
-                    UserName = "User Name", // You'll need to join with Users table
+                    UserName = "User Name", 
                     CreatedAt = ub.CreatedAt
                 }).ToList();
 
@@ -358,7 +358,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     BadgeName = ub.Badge.Name,
                     BadgeDescription = ub.Badge.Description,
                     //    BadgeType = ub.Badge.BadgeType,
-                    UserName = "User Name", // You'll need to join with Users table
+                    UserName = "User Name", 
                     CreatedAt = ub.CreatedAt
                 }).ToList();
 

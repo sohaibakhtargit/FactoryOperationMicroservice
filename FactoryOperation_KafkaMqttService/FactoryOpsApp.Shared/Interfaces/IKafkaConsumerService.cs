@@ -1,4 +1,6 @@
-﻿namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Interfaces
+﻿using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Models;
+
+namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Interfaces
 {
     public interface IKafkaConsumerService : IDisposable
     {

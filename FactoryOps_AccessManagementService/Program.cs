@@ -5,7 +5,16 @@ using FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Impl
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.Authentication;
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.ExceptionLogger;
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.InfrastructureServices;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.GlobalFilters;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.AI;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.Security;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.GlobalFilters;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Repository.TenantAdmin.GlobalFilters;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Service.Security;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.GlobalFilters;
+using FactoryOps_AccessManagementService.Middleware;
 using FactoryOpsApp.Infrastructure.DBContext;
+using FactoryOpsApp.Infrastructure.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -74,24 +83,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
          ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
          ValidAudience = builder.Configuration["JwtSettings:Audience"],
          IssuerSigningKey = new SymmetricSecurityKey(
-             Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]))
-     };
-
-     options.Events = new JwtBearerEvents
-     {
-         OnMessageReceived = context =>
-         {
-             var accessToken = context.Request.Query["access_token"];
-             var path = context.HttpContext.Request.Path;
-
-             if (!string.IsNullOrEmpty(accessToken) &&
-                 path.StartsWithSegments("/notificationHub"))
-             {
-                 context.Token = accessToken;
-             }
-
-             return Task.CompletedTask;
-         }
+             Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]!))
      };
  });
 
@@ -109,6 +101,13 @@ builder.Services.AddScoped<TenantDbContextFactory>();
 builder.Services.AddScoped<IExceptionLoggerService, ExceptionLoggerService>();
 builder.Services.AddScoped<IFactoryAuthenticationService, FactoryAuthenticationService>();
 builder.Services.AddScoped<IFactoryAuthenticationRepository, FactoryAuthenticationRepository>();
+builder.Services.AddScoped<IGlobalFiltersRepositories, GlobalFiltersRepository>();
+builder.Services.AddScoped<IGlobalFiltersServices, GlobalFiltersServices>();
+builder.Services.AddHttpClient<IOpenAiService, OpenAiService>();
+builder.Services.AddScoped<IAiQueryService, AiQueryService>();
+builder.Services.AddScoped<IDBBotService, DBBotService>();
+
+builder.Services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
 
 
 builder.Services.AddHttpContextAccessor();
@@ -119,15 +118,30 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructureServices(builder.Configuration);
+
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("CorsPolicy", builder =>
+//        builder
+//        .SetIsOriginAllowed(_ => true)
+//        .AllowAnyMethod()
+//        .AllowAnyHeader()
+//        .AllowCredentials()
+//        );
+//});
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CorsPolicy", builder =>
-        builder
-        .SetIsOriginAllowed(_ => true)
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials()
-        );
+    options.AddPolicy("CorsPolicy", policy =>
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "https://ms.stagingsdei.com:8108"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials());
 });
 
 
@@ -149,7 +163,7 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.UseMiddleware<ForceLogoutMiddleware>();   // ForceLogoutMiddleware
 app.MapControllers();
 
 app.Run();

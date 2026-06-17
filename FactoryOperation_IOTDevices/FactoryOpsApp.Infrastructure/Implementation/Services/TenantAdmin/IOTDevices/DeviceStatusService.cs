@@ -1,5 +1,4 @@
-﻿using FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.IOTDevices;
-using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
+﻿using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using FactoryOpsApp.Infrastructure.DBContext;
 using FactoryOpsApp_IOTDevices.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.IOTDevices;
 

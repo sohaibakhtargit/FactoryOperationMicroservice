@@ -29,6 +29,8 @@ namespace FactoryOpsApp.Application.DTOs
         public string Priority { get; set; }
         public string? Location { get; set; }
         public int? LocationId { get; set; }
+        public int? TechId { get; set; }
+        public string? TechName { get; set; }
         public List<string> SkillsRequired { get; set; }
         public WorkOrderStatus? Status { get; set; }
     }

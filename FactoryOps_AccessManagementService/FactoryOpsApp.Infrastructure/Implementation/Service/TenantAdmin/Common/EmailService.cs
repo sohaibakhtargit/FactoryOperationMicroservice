@@ -28,19 +28,15 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             {
                 var message = new MimeMessage();
 
-                // From
                 message.From.Add(new MailboxAddress("", email.From));
 
-                // To
-                message.To.Add(new MailboxAddress("", email.To));
+                message.To.Add(new MailboxAddress("", email.To));                
 
-                // CC
                 foreach (var cc in email.Cc)
                 {
                     message.Cc.Add(new MailboxAddress("", cc));
                 }
 
-                // BCC
                 foreach (var bcc in email.Bcc)
                 {
                     message.Bcc.Add(new MailboxAddress("", bcc));
@@ -50,7 +46,6 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 var builder = new BodyBuilder { HtmlBody = email.Body };
 
-                // Attachments
                 foreach (var attachment in email.Attachments)
                 {
                     builder.Attachments.Add(attachment.FileName, attachment.Content);
@@ -59,7 +54,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 message.Body = builder.ToMessageBody();
 
                 using var client = new SmtpClient();
-                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                //client.ServerCertificateValidationCallback = (s, c, h, e) => true;
                 await client.ConnectAsync(
                     _settings.Host,
                     _settings.Port,

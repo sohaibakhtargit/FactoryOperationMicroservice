@@ -1,10 +1,9 @@
 ﻿using FactoryOpsApp.Application.Common;
 using FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.WorkOrderManagement;
-using FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.WorkOrderManagement;
 using Microsoft.AspNetCore.Mvc;
+using static FactoryOperation_WorkOrder.FactoryOpsApp.Application.DTOs.TechnicianLoadDto;
 using static FactoryOpsApp.Application.DTOs.WorkOrderCreateDto;
-
 namespace FactoryOperation_Work_Order.Controllers.TenantAdminController.WorkOrderManagement
 {
     /// <summary>
@@ -30,23 +29,46 @@ namespace FactoryOperation_Work_Order.Controllers.TenantAdminController.WorkOrde
         /// <returns>Work order creation result</returns>
         /// <response code="200">Work order successfully created</response>
         //[Authorize]
+
+        //[HttpPost("Create-WorkOrder")]
+        //public async Task<IActionResult> CreateWorkOrderAsync([FromBody] WorkOrderCreateDto dto)
+        //{
+        //    var result = await _service.CreateWorkOrderAsync(dto);
+        //    return StatusCode(int.Parse(result.StatusCode), result);
+        //}
+
+
         [HttpPost("Create-WorkOrder")]
-        public async Task<IActionResult> CreateWorkOrderAsync([FromBody] WorkOrderCreateDto dto)
+        public async Task<IActionResult> CreateWorkOrderAsync(
+            [FromBody] WorkOrderCreateDto dto)
         {
             var result = await _service.CreateWorkOrderAsync(dto);
-            return StatusCode(int.Parse(result.StatusCode), result);
+
+            return StatusCode(int.Parse(result.StatusCode!), result);
         }
+
+        [HttpPost("update-progress-media")]
+        public async Task<IActionResult> UploadWorkOrderMediaAsync([FromForm] WorkOrderProgressMediaDto dto)
+        {
+            var result = await _service.UploadWorkOrderMediaAsync(dto);
+
+            return StatusCode(int.Parse(result.StatusCode!), result);
+        }
+
+        /*  [HttpPost("Create-WorkOrder")]
+          public async Task<IActionResult> CreateWorkOrderAsync([FromForm] WorkOrderCreateDto dto)
+          {
+              var result = await _service.CreateWorkOrderAsync(dto);
+              return StatusCode(int.Parse(result.StatusCode), result);
+          }*/
 
         [HttpPost("bulk-import")]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> ImportWorkOrders(
-      [FromForm] BulkWorkOrderImportRequest request)
+        public async Task<IActionResult> ImportWorkOrders([FromForm] BulkWorkOrderImportRequest request)
         {
             var result = await _service.ImportBulkWorkOrdersAsync(request);
             return Ok(result);
         }
-
-
 
         /// <summary>
         /// Update work order
@@ -59,7 +81,7 @@ namespace FactoryOperation_Work_Order.Controllers.TenantAdminController.WorkOrde
         public async Task<IActionResult> UpdateWorkOrderAsync([FromBody] WorkOrderUpdateDto dto)
         {
             var result = await _service.UpdateWorkOrderAsync(dto);
-            return StatusCode(int.Parse(result.StatusCode), result);
+            return StatusCode(int.Parse(result.StatusCode!), result);
         }
 
         /// <summary>
@@ -71,10 +93,10 @@ namespace FactoryOperation_Work_Order.Controllers.TenantAdminController.WorkOrde
         /// <returns>Deletion operation result</returns>
         /// <response code="200">Work order successfully deleted</response>
         [HttpPost("delete-WorkOrder")]
-        public async Task<IActionResult> DeleteWorkOrderAsync(int WorkOrderId, int tenantId)
+        public async Task<IActionResult> DeleteWorkOrderAsync(WorkOrderDeleteDto dto)
         {
-            var result = await _service.DeleteWorkOrderAsync(WorkOrderId, tenantId);
-            return StatusCode(int.Parse(result.StatusCode), result);
+            var result = await _service.DeleteWorkOrderAsync(dto);
+            return StatusCode(int.Parse(result.StatusCode!), result);
         }
 
         /// <summary>
@@ -93,8 +115,15 @@ namespace FactoryOperation_Work_Order.Controllers.TenantAdminController.WorkOrde
         //}
 
 
+        [HttpPost("Bulk-WorkOrder-Delete")]
+        public async Task<IActionResult> BulkWorkOrderDelete(WorkOrderBulkDeleteDto dto)
+        {
+            var result = await _service.BulkWorkOrderDelete(dto);
+            return StatusCode(int.Parse(result.StatusCode!), result);
+        }
+
         [HttpGet("Get-all-WorkOrder")]
-        public async Task<IActionResult> GetWorkOrders(int tenantId, WorkOrderTypeEnum type)
+        public async Task<IActionResult> GetWorkOrders(int tenantId, WorkOrderTypeEnum? type)
         {
             var workOrders = await _service.GetWorkOrderAllAsync(tenantId, type);
             var criticalCount = workOrders.GetAllData.Count(x => x.Priority == PriorityLevel.Critical);
@@ -117,8 +146,8 @@ namespace FactoryOperation_Work_Order.Controllers.TenantAdminController.WorkOrde
         [HttpGet("Get-WorkOrder-ById")]
         public async Task<IActionResult> GetWorkOrderByIdAsync(int WorkOrderId, int tenantId)
         {
-            var result = await _service.GetWorkOrderByIdAsync(tenantId, WorkOrderId);
-            return StatusCode(int.Parse(result.StatusCode), result);
+            var result = await _service.GetWorkOrderByIdAsync(WorkOrderId, tenantId);
+            return StatusCode(int.Parse(result.StatusCode!), result);
         }
 
         /// <summary>
@@ -164,13 +193,79 @@ namespace FactoryOperation_Work_Order.Controllers.TenantAdminController.WorkOrde
         public async Task<IActionResult> UpdateWorkOrderProgressAsync([FromForm] WorkOrderProgresssUpdateDto dto)
         {
             var result = await _service.UpdateWorkOrderProgressAsync(dto);
-            return StatusCode(int.Parse(result.StatusCode), result);
+            return StatusCode(int.Parse(result.StatusCode!), result);
         }
-        [HttpGet("Get-all-WorkOrderProgress")]
-        public async Task<IActionResult> GetWorkOrderProgressAsync(int tenantId)
+
+        [HttpPost("Approve-Reject-Workorder")]
+        public async Task<ActionResult<CommonResponseModel>> ApproveRejectWorkOrderAsync(WorkOrderApprovalDto dto)
         {
-            var result = await _service.GetWorkOrderProgressAsync(tenantId);
-            return StatusCode(int.Parse(result.StatusCode), result);
+            var result = await _service.ApproveRejectWorkOrderAsync((WorkOrderApprovalDto)dto);
+            return StatusCode(int.Parse(result?.StatusCode!), result);
+        }
+
+        [HttpGet("Get-all-WorkOrderProgress")]
+        public async Task<IActionResult> GetWorkOrderProgressAsync(int tenantId, int? userId)
+        {
+            var result = await _service.GetWorkOrderProgressAsync(tenantId, userId);
+            return StatusCode(int.Parse(result.StatusCode!), result);
+        }
+
+        // Cost Integration APIs
+        [HttpGet("Get-All-InventoryInfo")]
+        public async Task<IActionResult> GetInventoryItemInfo(int tenantId)
+        {
+            var result = await _service.GetInventoryItemInfo(tenantId);
+            return Ok(result);
+        }
+
+        [HttpGet("Get-All-WorkOrderIntegration")]
+        public async Task<IActionResult> GetWorkOrderIntegration(int tenantId)
+        {
+            var result = await _service.GetWorkOrderIntegration(tenantId);
+            return Ok(result);
+        }
+
+        [HttpGet("Get-All-CostReport")]
+        public async Task<IActionResult> GetCostReport(int tenantId)
+        {
+            var result = await _service.GetCostReportAsync(tenantId);
+            return Ok(result);
+        }
+
+        [HttpGet("Get-All-WorkOrderPartUsage")]
+        public async Task<IActionResult> GetWorkOrderPartUsageAsync(int tenantId)
+        {
+            var result = await _service.GetWorkOrderPartUsageAsync(tenantId);
+            return Ok(result);
+
+        }
+
+        [HttpGet("Get- GetWorkOrderTimelineAsync")]
+        public async Task<IActionResult> GetWorkOrderTimelineAsync(int tenantId,  int? userId = null)
+        {
+            var result = await _service.GetWorkOrderTimelineAsync(tenantId, userId );
+            return Ok(result);
+        }
+        [HttpGet("recent-workorder-updates")]
+        public async Task<IActionResult> GetRecentWorkOrderUpdates(int tenantId, int? userId, int? workorderId)
+        {
+            var result = await _service.GetRecentWorkOrderUpdatesAsync(tenantId, userId, workorderId);
+            return Ok(result);
+        }
+
+        [HttpGet("Analytics&Report-Wo")]
+        public async Task<IActionResult> GetWorkOrderDashboard(int tenantId)
+        {
+            var result = await _service.GetWorkOrderDashboardAsync(tenantId);
+            return Ok(result);
+        }
+
+        [HttpPost("update-calendar")]
+        public async Task<IActionResult> UpdateWorkOrderCalendar([FromBody] WorkOrderCalendarUpdateDto dto)
+        {
+            var result = await _service.UpdateWorkOrderCalendarAsync(dto);
+
+            return StatusCode(int.Parse(result.StatusCode!), result);
         }
     }
 }

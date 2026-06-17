@@ -21,7 +21,7 @@ namespace FactoryOpsApp.Application.DTOs
         public int TenantId { get; set; }
         public int FeedbackId { get; set; }
 
-        // Optional fields to update
+       
         public int? Rating { get; set; }
         public string? Comments { get; set; }
         public bool? IsActive { get; set; }

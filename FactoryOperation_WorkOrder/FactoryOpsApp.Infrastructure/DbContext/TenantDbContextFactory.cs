@@ -33,7 +33,7 @@ namespace FactoryOpsApp.Infrastructure.DBContext
             }
 
             var template = _configuration.GetConnectionString("TenantDbConnection");
-            var connectionString = string.Format(template, dbName);
+            var connectionString = string.Format(template!, dbName);
 
             var options = new DbContextOptionsBuilder<FactoryOpsDBContext>()
                 .UseNpgsql(connectionString)

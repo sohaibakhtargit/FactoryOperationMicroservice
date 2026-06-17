@@ -32,7 +32,6 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             _configuration = configuration;
             _fileStorageService = fileStorageService;
         }
-
         public async Task<CommonResponseModel> CreateCompanyBrandingAsync(CreateCompanyBrandingDto dto)
         {
             var response = new CommonResponseModel();
@@ -49,20 +48,35 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     return response;
                 }
 
-                string? relativePath = null;
+                string? companyImagePath = null;
+                string? companyNameLogoPath = null;
                 byte[]? imageBytes = null;
 
+                
                 if (dto.CompanyImageFile != null)
                 {
-                    relativePath = await _fileStorageService.SaveFileAsync(dto.CompanyImageFile, "CompanyImages");
-                    imageBytes = await File.ReadAllBytesAsync(Path.Combine("wwwroot", relativePath));
+                    companyImagePath = await _fileStorageService.SaveFileAsync(dto.CompanyImageFile, "CompanyImages");
+                    imageBytes = await File.ReadAllBytesAsync(Path.Combine("wwwroot", companyImagePath));
+                }
+
+               
+                if (dto.CompanyNameLogo != null)
+                {
+                    companyNameLogoPath = await _fileStorageService.SaveFileAsync(dto.CompanyNameLogo, "CompanyNameLogos");
                 }
 
                 var newCompanyBranding = new CompanyBrandingInfo
                 {
                     CompanyName = dto.CompanyName,
-                    CompanyImage = dto.CompanyImageFile.FileName ?? null,
-                    CompanyLogo = relativePath,
+
+                    // ✅ Correct: store saved file path (not FileName)
+                    CompanyImage = companyImagePath,
+
+                    // (Leaving as-is since already exists in your model)
+                    CompanyLogo = companyImagePath,
+
+                    CompanyNameLogo = companyNameLogoPath,
+
                     IsActive = true,
                     IsDeleted = false,
                     CreatedAt = DateTime.UtcNow,
@@ -74,7 +88,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 await _auditLogger.LogAuditAsync(
                     "Create",
-                    $"Company branding '{dto.CompanyName}' created with {(imageBytes != null ? "Image" : "No Image")} and {(string.IsNullOrEmpty(dto.CompanyLogo) ? "No Logo" : "Logo")}",
+                    $"Company branding '{dto.CompanyName}' created with {(companyImagePath != null ? "Image" : "No Image")} and {(companyNameLogoPath != null ? "Text Logo" : "No Text Logo")}",
                     null,
                     null,
                     "CompanyBrandingModule"
@@ -88,6 +102,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
+
                 await _exceptionLogger.LogExceptionAsync(
                     ex,
                     "CompanyBrandingModule",
@@ -102,6 +117,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
             return response;
         }
+
         public async Task<CommonResponseModel> UpdateCompanyBrandingAsync(UpdateCompanyBrandingDto dto)
         {
             var response = new CommonResponseModel();
@@ -122,20 +138,27 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 if (await _masterDbcontext.CompanyBrandingInfo.AnyAsync(c =>
                     c.Id != dto.Id &&
-                    c.CompanyName.ToLower() == dto.CompanyName.ToLower() && !c.IsDeleted))
+                    c.CompanyName.ToLower() == dto.CompanyName.ToLower() &&
+                    !c.IsDeleted))
                 {
                     response.StatusCode = StatusCode.BadRequest;
                     response.StatusMessage = CompanyBrandingInfoStatusMessage.BadRequest;
                     return response;
                 }
 
+                
                 if (dto.CompanyImageFile != null)
                 {
-                    var relativePath = await _fileStorageService.SaveFileAsync(dto.CompanyImageFile, "CompanyImages");
-                    var imageBytes = await File.ReadAllBytesAsync(Path.Combine("wwwroot", relativePath));
+                    var imagePath = await _fileStorageService.SaveFileAsync(dto.CompanyImageFile, "CompanyImages");
+                    existingCompany.CompanyImage = imagePath;
+                    existingCompany.CompanyLogo = imagePath;
+                }
 
-                    existingCompany.CompanyImage = dto.CompanyImageFile.FileName;
-                    existingCompany.CompanyLogo = relativePath;
+                
+                if (dto.CompanyNameLogo != null)
+                {
+                    var nameLogoPath = await _fileStorageService.SaveFileAsync(dto.CompanyNameLogo, "CompanyNameLogos");
+                    existingCompany.CompanyNameLogo = nameLogoPath;
                 }
 
                 existingCompany.CompanyName = dto.CompanyName;
@@ -159,6 +182,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
+
                 await _exceptionLogger.LogExceptionAsync(
                     ex,
                     "CompanyBrandingModule",
@@ -173,12 +197,13 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
             return response;
         }
+
         public GetAllRecord<CompanyBrandingResponseDto> GetAllCompanyBrandings()
         {
             var response = new GetAllRecord<CompanyBrandingResponseDto>();
             try
             {
-                string baseUrl = _configuration["BaseUrl:Staging"] ?? "https://ms.stagingsdei.com:8107";
+                string baseUrl = _configuration["BaseUrl:Staging"] ?? "https://ms.stagingsdei.com:8128";
                 var companyBrandings = _masterDbcontext.CompanyBrandingInfo
                     .Where(c => !c.IsDeleted)
                     .OrderByDescending(c => c.CreatedAt)
@@ -186,6 +211,9 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     {
                         Id = c.Id,
                         CompanyName = c.CompanyName,
+                        CompanyNameLogo = c.CompanyNameLogo != null
+                       ? $"{baseUrl}/{c.CompanyNameLogo.Replace("\\", "/")}"
+                         : null,
                         CompanyImage = c.CompanyImage != null ? $"/api/companybranding/image/{c.Id}" : null,
                         CompanyLogo = c.CompanyLogo != null
                         ? $"{baseUrl}/{c.CompanyLogo.Replace("\\", "/")}"

@@ -50,7 +50,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
         public async Task<ReportsAnalyticsSuperAdminDto> GetTenantAnalyticsReportForSuperAdminAsync()
         {
-            // 1. Performance Metrics Calculated Above
+            
             double maxExpectedDbQueryTime = 200;
             double avgDbQueryTime = 120;
 
@@ -63,14 +63,14 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             double responseTimePercent = 100 - (avgResponseTime / 500 * 100);
             responseTimePercent = Math.Clamp(responseTimePercent, 0, 100);
 
-            // 2. Storage Usage
+           
             DriveInfo drive = DriveInfo.GetDrives().First(d => d.IsReady && d.Name == "C:\\");
             double used = drive.TotalSize - drive.TotalFreeSpace;
             double storageUsagePercent = (used / drive.TotalSize) * 100;
             string storageUsedGB = $"{Math.Round(used / (1024.0 * 1024 * 1024), 2)} GB";
 
 
-            // 3. Request/Failure Stats
+            
             DateTime since = DateTime.UtcNow.AddHours(-24);
 
             int totalRequests = await _masterDbcontext.Audit_Log_MasterDb
@@ -82,7 +82,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             double errorRatePercent = totalRequests == 0 ? 0 : (double)failedRequests / totalRequests * 100;
             string errorRateString = $"{Math.Round(errorRatePercent, 2)}%";
 
-            // 4. Final DTO Assignment
+           
             var performanceMetrics = new PerformanceMetricsDto
             {
                 DatabasePerformance = $"{Math.Round(dbPerformancePercent)}%",
@@ -168,7 +168,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             }
 
 
-            // 5. Return Combined DTO
+          
             return new ReportsAnalyticsSuperAdminDto
             {
                 ActiveTenants = tenants.Count,
@@ -189,7 +189,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 if (OperatingSystem.IsWindows())
                 {
                     using var cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-                    _ = cpuCounter.NextValue(); // First call always returns 0
+                    _ = cpuCounter.NextValue(); 
                     Thread.Sleep(500);
                     return Math.Round(cpuCounter.NextValue(), 2);
                 }

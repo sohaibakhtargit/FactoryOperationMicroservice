@@ -22,10 +22,15 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public MasterNotification? MasterNotification { get; set; }
 
         public int? WorkOrderId { get; set; }
+        public int? ServiceRequestId { get; set; }
+
+        public int TenantId { get; set; } 
 
         public int? TargetUsersId { get; set; }
-
+        public int? IncomingNotifications { get; set; }
+        public int? OutgoingNotifications { get; set; }
         public bool IsRead { get; set; } = false;
+        public bool IsReadByTenant { get; set; } = false;
 
         public int? CreatedBy { get; set; }
 

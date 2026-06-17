@@ -65,7 +65,7 @@ namespace FactoryOperation_IOTDevices.FactoryOpsApp.Infrastructure.Implementatio
                     return response;
                 }
 
-                // Fetch telemetry records
+              
                 var telemetryRecords = await tenantDb.Telemetry
                     .Where(t => t.DeviceId == deviceId && t.IsActive && !t.IsDeleted)
                     .OrderByDescending(t => t.Timestamp)
@@ -78,7 +78,7 @@ namespace FactoryOperation_IOTDevices.FactoryOpsApp.Infrastructure.Implementatio
                     })
                     .ToListAsync();
 
-                // Fetch latest device status logs
+              
                 var statusLogs = await tenantDb.DeviceStatusLogs
                     .Where(l => l.DeviceId == deviceId && l.IsActive && !l.IsDeleted)
                     .OrderByDescending(l => l.EventTime)

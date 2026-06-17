@@ -4,6 +4,7 @@ namespace FactoryOperation_NotificationService.FactoryOpsApp.Application.Interfa
 {
     public interface INotificationRepository
     {
-        Task SaveAsync(NotificationModel model);
+        // Task SaveAsync(NotificationModel model);
+        Task<int> SaveAsync(NotificationModel model);
     }
 }

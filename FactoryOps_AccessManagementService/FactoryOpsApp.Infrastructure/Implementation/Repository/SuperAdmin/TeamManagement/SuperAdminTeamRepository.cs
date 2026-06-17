@@ -57,7 +57,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     }
                     catch (Exception)
                     {
-                        // Handle per-tenant failure gracefully
+                        
                         return new List<SuperAdminTeamDto>();
                     }
                 });
@@ -86,7 +86,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
         public async Task<GetAllRecord<SuperAdminTeamDto>> GetAllTeamsFromAllTenantsAsync()
         {
-            // Reuse the same logic as GetAllTeamsAsync()
+            
             return await GetAllTeamsAsync();
         }
     }

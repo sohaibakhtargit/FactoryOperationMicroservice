@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FactoryOpsApp.Domain.Entities.MasterTenantsAdmin
@@ -12,7 +7,7 @@ namespace FactoryOpsApp.Domain.Entities.MasterTenantsAdmin
     {
         [Key]
         public int TenantId { get; set; } // FK to FactoryTenants
-        public string? TenantName { get; set; }  
+        public string? TenantName { get; set; }
 
         [Required]
         [MaxLength(20)]
@@ -25,6 +20,8 @@ namespace FactoryOpsApp.Domain.Entities.MasterTenantsAdmin
 
         [MaxLength(512)]
         public string? LogoUrl { get; set; }
+
+        public string? LogoText { get; set; }
 
         [MaxLength(255)]
         public string? ColorScheme { get; set; }

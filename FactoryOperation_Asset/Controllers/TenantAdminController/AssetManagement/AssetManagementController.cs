@@ -34,6 +34,15 @@ namespace FactoryOpsApp.API.Controllers.TenantAdminContoller.AssetManagement
             return Ok(result);
         }
 
+
+        [HttpPost("bulk-import")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> ImportAssets([FromForm] BulkAssetImportRequest request)
+        {
+            var result = await _assetManagementService.ImportBulkAssetAsync(request);
+            return Ok(result);
+        }
+
         /// <summary>
         /// Update asset registry
         /// Modifies existing asset information in the registry
@@ -76,5 +85,26 @@ namespace FactoryOpsApp.API.Controllers.TenantAdminContoller.AssetManagement
             var result = await _assetManagementService.DeleteAsset(id, tenantId);
             return Ok(result);
         }
+
+        [HttpPost("Bulk-Asset-Delete")]
+        public async Task<IActionResult>BulkAssetDeleteAsync(int tenantId, List<int> AssetId)
+        {
+            var result = await _assetManagementService.BulkAssetDeleteAsync(tenantId, AssetId);
+            return Ok(result);
+        }
+
+        [HttpGet("Download-Asset-Billing-Pdf")]
+        public async Task<IActionResult> DownloadAssetBillingPdf(int tenantId, int assetId)
+        {
+            var result = await _assetManagementService
+                .DownloadAssetBillingPdf(tenantId, assetId);
+
+            return File(
+                result.fileBytes,
+                "application/pdf",
+                result.fileName
+            );
+        }
+
     }
 }

@@ -108,9 +108,17 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
                             var payload = new
                             {
                                 ts = DateTime.UtcNow,
-                                temperature = Math.Round(rnd.NextDouble() * 40.0 + 5.0, 2),
-                                humidity = Math.Round(rnd.NextDouble() * 60.0 + 20.0, 2),
-                                vibration = Math.Round(rnd.NextDouble() * 10.0, 2),
+
+                                temperature = Math.Round(rnd.NextDouble() * 35.0 + 10.0, 2),   // 10–45 °C
+                                vibration = Math.Round(rnd.NextDouble() * 5.0, 2),             // 0–5 mm/s
+                                pressure = Math.Round(rnd.NextDouble() * 15.0 + 95.0, 2),      // 95–110 kPa
+                                rpm = rnd.Next(900, 1800),
+
+                                voltage = Math.Round(rnd.NextDouble() * 40 + 200, 2),          // 200–240 V
+                                current = Math.Round(rnd.NextDouble() * 15 + 5, 2),            // 5–20 A
+                                power = Math.Round(rnd.NextDouble() * 5 + 2, 2),               // 2–7 kW
+                                load = Math.Round(rnd.NextDouble() * 100, 2),                  // %
+
                                 ok = rnd.Next(0, 100) > 5
                             };
                             var bytes = JsonSerializer.SerializeToUtf8Bytes(payload);

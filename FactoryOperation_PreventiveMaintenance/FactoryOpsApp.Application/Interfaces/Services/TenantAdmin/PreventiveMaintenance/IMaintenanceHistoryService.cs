@@ -12,7 +12,7 @@ namespace FactoryOperation_PreventiveMaintenance.FactoryOpsApp.Application.Inter
     public interface IMaintenanceHistoryService
     {
         Task<CommonResponseModel> AddMaintenanceHistoryAsync(MaintenanceHistoryDto dto);
-        Task<CommonResponseModel> UpdateMaintenanceHistoryAsync(MaintenanceHistoryDto dto);
+        Task<CommonResponseModel> UpdateMaintenanceHistoryAsync(UpdateMaintenanceHistoryDto dto);
         Task<CommonResponseModel> DeleteMaintenanceHistoryAsync(long maintenanceId, int tenantId);
         Task<GetAllRecord<GetMaintenanceHistoryDto>> GetAllMaintenanceHistoryAsync(int tenantId, string? searchTerm = null, string? statusFilter = null, string? typeFilter = null);
         Task<GetSpecificRecord<GetMaintenanceHistoryDto>> GetMaintenanceHistoryByIdAsync(long maintenanceId, int tenantId);

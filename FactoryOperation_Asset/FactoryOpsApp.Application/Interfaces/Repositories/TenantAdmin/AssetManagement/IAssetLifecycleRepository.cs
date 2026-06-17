@@ -1,5 +1,6 @@
 ﻿using FactoryOpsApp.Application.Common;
 using FactoryOpsApp.Application.DTOs;
+using System.Collections.Generic;
 
 namespace FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.AssetManagement
 {
@@ -12,6 +13,8 @@ namespace FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.AssetMan
         Task<GetSpecificRecord<GetAssetLifecycleDto>> GetAssetLifecycleByIdAsync(long lifecycleId, int tenantId);
         Task<GetSpecificRecord<GetAssetLifecycleDto>> GetAssetLifecycleByAssetIdAsync(int assetId, int tenantId);
         Task<GetSpecificRecord<AssetLifecycleMetricsDto>> GetAssetLifecycleMetricsAsync(int tenantId);
+        Task<GetSpecificRecord<AssetLifecycleFinancialSummaryDTO>> GetAssetLifeCycleSummery(int tenatId);
+        Task<GetAllRecordsCount<AssetLifeHistoryReportDTO>> GetAssetLifeHistoryReport(int tenantId, int assetId);
     }
 
     public interface IAssetFinancialAnalysisRepository

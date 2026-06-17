@@ -1,6 +1,7 @@
 ﻿using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Repositories.SuperAdmin.TenantManagement;
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.SuperAdmin.TenantManagement;
 using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Common;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Application.DTOs;
 
 namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Service.SuperAdmin.TenantManagement
@@ -54,6 +55,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         public Task<GetAllRecord<ModulelistDto>> GetAllModuleAsync(int TenantId)
         {
             return _ITenantRepo.GetAllModuleAsync(TenantId);
+        }
+
+        public Task<GetSpecificRecord<TenantDashboardDto>> GetTenantDashboard(int TenantId)
+        {
+            return _ITenantRepo.GetTenantDashboard(TenantId);
         }
 
     }

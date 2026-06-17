@@ -33,7 +33,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         {
             var dto = new MonitoringHealthDto();
 
-            // 1. Tenant/User/Support Ticket Metrics
+            
             var tenants = await _masterDbContext.FactoryTenants
                 .Where(t => t.IsActive && !t.IsDeleted)
                 .ToListAsync();
@@ -73,21 +73,21 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             dto.TotalSupportTickets = totalSupportTickets;
             dto.OpenSupportTickets = openSupportTickets;
 
-            // 2. System Load (CPU Usage)
+           
             dto.SystemLoad = GetCpuUsage();
 
-            // 3. Security Monitoring (Placeholder - Implement your logic)
+            
             dto.FailedLoginRate = GetFailedLoginRate();
             dto.UnusualActivityCount = GetUnusualActivityCount();
             dto.RateLimitViolations = GetRateLimitViolations();
 
-            // 4. API Performance (Placeholder - Implement from API monitoring)
+            
             dto.P50Latency = GetLatencyPercentile(50);
             dto.P95Latency = GetLatencyPercentile(95);
             dto.P99Latency = GetLatencyPercentile(99);
             dto.TimeoutRate = GetTimeoutRate();
 
-            // 5. Infrastructure Health (Redis, Memory, Disk, Network)
+            
             dto.CacheHitRate = await GetCacheHitRateAsync();
             dto.MemoryUsage = GetMemoryUsage();
             dto.DiskUsage = GetDiskUsage();

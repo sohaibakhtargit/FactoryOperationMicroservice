@@ -2,6 +2,6 @@
 {
     public interface INotificationProcessor
     {
-        Task ProcessEventAsync(string topic, string jsonPayload);
+        Task ProcessEventAsync(string topic, byte[] jsonPayload);
     }
 }

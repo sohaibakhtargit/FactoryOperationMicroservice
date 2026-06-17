@@ -9,10 +9,11 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
     public enum AssetTrackingStatusEnum
     {
         Active,
-        Idle,
+        InActive, //Idle hi InActive hai
         Maintenance,
         Retired,
-        Down
+        Down,
+        
     }
 
     public class AssetTracking

@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FactoryOpsApp.Domain.Entities.MasterTenantsAdmin
 {
@@ -21,6 +16,7 @@ namespace FactoryOpsApp.Domain.Entities.MasterTenantsAdmin
         [MaxLength(255)]
         [Column("CompanyName")]
         public string CompanyName { get; set; } = string.Empty;
+        public string? CompanyNameLogo { get; set; }
 
         [Column("CompanyImage")]
         public string? CompanyImage { get; set; }

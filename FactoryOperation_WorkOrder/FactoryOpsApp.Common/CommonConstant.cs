@@ -429,7 +429,7 @@
             public const string AssignmentHistoryFetchFailed = "Failed to retrieve assignment history.";
             public const string NoAssignmentHistoryFound = "No assignment history found.";
         }
-
+       
         public static class WorkOrderStatusMessage
         {
             public const string WorkOrdersFetchedSuccessfully = "Fetched work orders successfully.";
@@ -444,6 +444,8 @@
             public const string WorkOrderUpdateFailed = "Failed to update work order.";
             public const string WorkOrderDeletionFailed = "Failed to delete work order.";
             public const string WorkOrderDeletion = "Work order deleted successfully.";
+            public const string BulkWorkOrderDeletionFailed = "Failed to delete work orders in bulk.";
+            public const string BulkWorkOrderDeletion = "Work orders deleted successfully in bulk.";
             public const string LaborAnalyticsFetchedSuccessfully = "Labor & Resource analytics fetched successfully.";
             public const string LaborAnalyticsFetchFailed = "Failed to fetch labor analytics.";
             public const string ResourceUsageAnalyticsFetched = "Resource usage analytics fetched successfully.";

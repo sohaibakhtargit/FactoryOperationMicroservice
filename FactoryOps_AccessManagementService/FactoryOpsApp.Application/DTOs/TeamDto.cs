@@ -26,12 +26,15 @@ namespace FactoryOpsApp.Application.DTOs
         public string Description { get; set; } = string.Empty;
 
         public int TenantId { get; set; }
-        public string TenantName { get; set; }
+        public string TenantName { get; set; }  = string.Empty;
         public int? SiteId { get; set; }
         public string? Site { get; set; }
         public string Department { get; set; } = string.Empty;
         public int? ManagerId { get; set; }
         public string ManagerName { get; set; } = string.Empty;
+        public int? ManagerRoleId { get; set; }
+        public string ManagerRoleName { get; set; } = string.Empty;
+
 
         public bool IsActive { get; set; } = true;
         public bool IsDeleted { get; set; } = false;
@@ -47,6 +50,8 @@ namespace FactoryOpsApp.Application.DTOs
     {
         public int? UserId { get; set; }
         public string MemberName { get; set; } = string.Empty;
+        public int? MemberRoleId { get; set; }
+        public string MemberRoleName { get; set; } = string.Empty;
     }
 
 

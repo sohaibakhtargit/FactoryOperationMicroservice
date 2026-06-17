@@ -310,10 +310,10 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
             try
             {
-                var Tenant = _masterDbcontext.FactoryTenants.
-                    FirstOrDefault(l => l.TenantId == TenantId && l.IsDeleted == false);
+                var tenant = _masterDbcontext.FactoryTenants
+                    .FirstOrDefault(x => x.TenantId == TenantId && !x.IsDeleted);
 
-                if (Tenant == null)
+                if (tenant == null)
                 {
                     response.StatusCode = StatusCode.NotFound;
                     response.StatusMessage = TeamStatusMessage.TenantNotFound;
@@ -322,32 +322,87 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(TenantId);
 
+                // =========================
+                // PRELOAD USER ROLES
+                // =========================
+                var userRoles = tenantDb.FactoryUserRoles
+                    .Include(x => x.FactoryRoles)
+                    .Where(x => !x.IsDeleted)
+                    .Select(x => new
+                    {
+                        x.UserId,
+                        x.RoleId,
+                        RoleName = x.FactoryRoles.RoleName
+                    })
+                    .ToList();
+
+                // =========================
+                // PRELOAD TEAM MEMBERS
+                // =========================
                 var allMembers = tenantDb.FactoryTeamMembers
                     .Include(m => m.User)
                     .Where(m => !m.IsDeleted)
+                    .ToList()
                     .Select(m => new
                     {
                         m.TeamId,
                         m.UserId,
-                        MemberName = m.User.FirstName + " " + m.User.LastName
+                        MemberName = m.User != null
+                            ? $"{m.User.FirstName} {m.User.LastName}"
+                            : "",
+
+                        MemberRoleId = userRoles
+                            .Where(r => r.UserId == m.UserId)
+                            .Select(r => (int?)r.RoleId)
+                            .FirstOrDefault(),
+
+                        MemberRoleName = userRoles
+                            .Where(r => r.UserId == m.UserId)
+                            .Select(r => r.RoleName)
+                            .FirstOrDefault()
                     })
                     .ToList();
+
+                // =========================
+                // GET TEAMS
+                // =========================
                 var teams = tenantDb.FactoryTeams
-                    .Include(t => t.Manager).Include(t => t.Location)
-                    .Where(t => !t.IsDeleted && (t.Manager == null || !t.Manager.IsDeleted))
-                    .AsEnumerable()
+                    .Include(t => t.Manager)
+                    .Include(t => t.Location)
+                    .Where(t => !t.IsDeleted &&
+                                (t.Manager == null || !t.Manager.IsDeleted))
+                    .ToList()
                     .Select(t => new GetTeamDto
                     {
                         TeamId = t.TeamId,
                         TeamName = t.Name,
                         Description = t.Description,
                         TenantId = t.TenantId,
-                        TenantName = Tenant.TenantName,
-                        SiteId = t.Site ?? null,
-                        Site = t.Location != null ? t.Location.LocationName : null,
+                        TenantName = tenant.TenantName,
+
+                        SiteId = t.Site,
+                        Site = t.Location != null
+                            ? t.Location.LocationName
+                            : null,
+
                         Department = t.Department,
-                        ManagerId = t.ManagerId ?? null,
-                        ManagerName = t.Manager != null ? t.Manager.FirstName + " " + t.Manager.LastName : "",
+
+                        ManagerId = t.ManagerId,
+
+                        ManagerName = t.Manager != null
+                            ? $"{t.Manager.FirstName} {t.Manager.LastName}"
+                            : "",
+
+                        ManagerRoleId = userRoles
+                            .Where(r => r.UserId == t.ManagerId)
+                            .Select(r => (int?)r.RoleId)
+                            .FirstOrDefault(),
+
+                        ManagerRoleName = userRoles
+                            .Where(r => r.UserId == t.ManagerId)
+                            .Select(r => r.RoleName)
+                            .FirstOrDefault() ?? "",
+
                         IsActive = t.IsActive,
                         IsDeleted = t.IsDeleted,
                         CreatedAt = t.CreatedAt,
@@ -360,8 +415,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                             .Select(m => new TeamMemberMapDto
                             {
                                 UserId = m.UserId,
-                                MemberName = m.MemberName
-                            }).ToList()
+                                MemberName = m.MemberName,
+                                MemberRoleId = m.MemberRoleId,
+                                MemberRoleName = m.MemberRoleName ?? ""
+                            })
+                            .ToList()
                     })
                     .ToList();
 
@@ -372,12 +430,13 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             catch (Exception ex)
             {
                 _exceptionLogger.LogExceptionAsync(
-                   ex,
-                   sourceModule: "TeamModule",
-                   apiName: "GetAllTeams",
-                   tenantId: TenantId,
-                   userId: null
-               );
+                    ex,
+                    sourceModule: "TeamModule",
+                    apiName: "GetAllTeams",
+                    tenantId: TenantId,
+                    userId: null
+                );
+
                 response.StatusCode = StatusCode.Error;
                 response.StatusMessage = $"{TeamStatusMessage.TeamFetchFailed}: {ex.Message}";
             }
@@ -408,7 +467,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     {
                         m.TeamId,
                         m.UserId,
-                        MemberName = m.User.FirstName + " " + m.User.LastName
+                        MemberName = m.User!.FirstName + " " + m.User.LastName
                     })
                     .ToList();
                 var teams = tenantDb.FactoryTeams

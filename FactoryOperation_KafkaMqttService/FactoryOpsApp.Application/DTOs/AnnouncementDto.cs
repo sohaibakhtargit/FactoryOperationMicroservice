@@ -9,7 +9,7 @@
         public string? Status { get; set; } = "draft"; 
         public int CreatedBy { get; set; }
 
-        // ✅ Add these to allow single API input
+      
         public List<string> Channels { get; set; } = new();    
         public List<int> TenantIds { get; set; } = new();      
     }
@@ -23,12 +23,12 @@
         public DateTime? ScheduledTime { get; set; }
         public string Status { get; set; } = string.Empty;
 
-        // Optional for frontend use
+        
         public List<string> Channels { get; set; } = new();
         public List<int> TenantIds { get; set; } = new();
     }
 
-    // You can keep these separate for individual insert/update if needed later
+    
     public class AddAnnouncementChannelDto
     {
         public int AnnouncementId { get; set; }

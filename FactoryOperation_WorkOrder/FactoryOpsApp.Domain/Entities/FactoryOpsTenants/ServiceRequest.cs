@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
 {
@@ -9,17 +10,18 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int ServiceRequestId { get; set; }
+
         public int TenantId { get; set; }
 
         [Required]
         [MaxLength(20)]
-        public string RequestNumber { get; set; }
+        public string RequestNumber { get; set; } = string.Empty;
 
         [Required]
         [MaxLength(200)]
-        public string Title { get; set; }
+        public string Title { get; set; } = string.Empty;
 
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
         public int? LocationId { get; set; }
 
@@ -28,6 +30,20 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
 
         [Required]
         public ServiceRequestPriority Priority { get; set; } = ServiceRequestPriority.Medium;
+
+        public int? AssetId { get; set; }
+
+        public int? WorkOrderId { get; set; }
+
+        public int? ApprovedBy { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+
+        public int? RejectedBy { get; set; }
+        public DateTime? RejectedAt { get; set; }
+        public string? ServiceRequestMedia { get; set; }
+        public string? ServiceRequestMediaPath { get; set; }
+        public string? FileType { get; set; }
+        public string? RejectionReason { get; set; }
 
         public int? AssignedToUserId { get; set; }
         public int? AssignedToTeamId { get; set; }
@@ -56,31 +72,58 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public DateTime? DeletedAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public ICollection<WorkOrderRequiredTool>? RequiredTools { get; set; }
 
-        // Navigation properties with explicit ForeignKey attributes
-        [ForeignKey("AssignedToUserId")]
-        public virtual FactoryUsers AssignedUser { get; set; }
+        [ForeignKey(nameof(AssignedToUserId))]
+        public virtual FactoryUsers? AssignedUser { get; set; }
 
-        [ForeignKey("AssignedToTeamId")]
-        public virtual FactoryTeam AssignedTeam { get; set; }
+        [ForeignKey(nameof(AssignedToTeamId))]
+        public virtual FactoryTeam? AssignedTeam { get; set; }
 
-        [ForeignKey("LocationId")]
-        public virtual Location Location { get; set; }
+        [ForeignKey(nameof(LocationId))]
+        public virtual Location? Location { get; set; }
+
+        [ForeignKey(nameof(AssetId))]
+        public virtual AssetRegistry? Asset { get; set; }
+
+        [ForeignKey(nameof(WorkOrderId))]
+        public virtual WorkOrder? WorkOrder { get; set; }
+
+        [ForeignKey(nameof(ApprovedBy))]
+        public virtual FactoryUsers? ApprovedUser { get; set; }
+
+        [ForeignKey(nameof(RejectedBy))]
+        public virtual FactoryUsers? RejectedUser { get; set; }
     }
+}
 
-    // Enums
-    public enum ServiceRequestStatus
+
+public enum ServiceRequestStatus
     {
         Pending,
+        Approved,
+        Rejected,
         Assigned,
+        ReOpened,
         InProgress,
+        OnHold,
         Completed,
-        Cancelled,
-        Overdue,
-        Started
+        Closed,
     }
 
-    public enum ServiceRequestPriority
+public enum ServiceRequestCategory
+    {
+        Electrical,
+        Mechanical,
+        Plumbing,
+        HVAC,
+        IT,
+        GeneralMaintenance,
+        Safety
+    }
+
+
+public enum ServiceRequestPriority
     {
         Low,
         Medium,
@@ -88,14 +131,14 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         Critical
     }
 
-    public enum ServiceRequestType
+
+public enum ServiceRequestType
     {
+        Preventive,
+        Corrective,
         Maintenance,
         Repair,
         Inspection,
         Cleaning,
-        Preventive,
-        Corrective,
         Other
     }
-}

@@ -8,7 +8,7 @@ namespace FactoryOpsApp.Application.DTOs
 {
     public class DeviceConfigurationDto
     {
-        public int ConfigId { get; set; } // for update/get
+        public int ConfigId { get; set; } 
         public int TenantId { get; set; }
         public int DeviceId { get; set; }
         public int SamplingRate { get; set; }

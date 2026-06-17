@@ -41,7 +41,7 @@ namespace FactoryOpsApp.Application.DTOs
         //public DateTime? SentAt { get; set; }
         //public bool IsSent { get; set; } = false;
 
-        //// Audit Fields
+
         public bool IsActive { get; set; } = true;
         public bool IsDeleted { get; set; } = false;
         public int? CreatedBy { get; set; }

@@ -19,9 +19,6 @@ namespace FactoryOpsApp.Application.DTOs
 
     //public class GetRolePermissionDto
     //{
-    //    public int RoleId { get; set; }
-    //    public string RoleName { get; set; }
-    //    public int? TenantId { get; set; }
     //    public List<RolePermissionMapDto> Permissions{ get; set; } = new();
 
     //}

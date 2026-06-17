@@ -1,6 +1,5 @@
 ﻿using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.WorkOrderServices;
 using FactoryOpsApp.Application.DTOs;
-using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FactoryOperation_WorkOrder.Controllers.TenantAdminController.WorkOrderManagement
@@ -142,5 +141,41 @@ namespace FactoryOperation_WorkOrder.Controllers.TenantAdminController.WorkOrder
             var result = await _serviceRequestService.GetOverdueServiceRequestsAsync(tenantId);
             return Ok(result);
         }
+
+        [HttpPost("approve")]
+        public async Task<IActionResult> Approve(ApproveServiceRequestDto dto)
+        {
+            var result = await _serviceRequestService.ApproveServiceRequestAsync(dto);
+            return Ok(result);
+        }
+
+        [HttpPost("reject")]
+        public async Task<IActionResult> Reject(RejectServiceRequestDto dto)
+        {
+            var result = await _serviceRequestService.RejectServiceRequestAsync(dto);
+            return Ok(result);
+        }
+
+        [HttpPost("assign")]
+        public async Task<IActionResult> Assign(AssignServiceRequestDto dto)
+        {
+            var result = await _serviceRequestService.AssignServiceRequestAsync(dto);
+            return Ok(result);
+        }
+
+        [HttpPost("reopen")]
+        public async Task<IActionResult> Reopen(ServiceRequestDto dto)
+        {
+            var result = await _serviceRequestService.ReopenServiceRequestAsync(dto);
+            return Ok(result);
+        }
+        [HttpPost("service-request-media")]
+        public async Task<IActionResult> UploadServiceRequestMediaAsync([FromForm] ServiceRequestMediaDto dto)
+        {
+            var result = await _serviceRequestService.UploadServiceRequestMediaAsync(dto);
+
+            return StatusCode(int.Parse(result.StatusCode!), result);
+        }
+
     }
 }

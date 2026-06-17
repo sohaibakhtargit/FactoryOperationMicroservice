@@ -11,17 +11,15 @@ namespace FactoryOpsApp.Application.DTOs
 {
     public class MaintenanceHistoryDto
     {
-        public long MaintenanceId { get; set; }
-
         [Required]
         public int AssetId { get; set; }
 
         public string? WorkOrderId { get; set; }
 
         [Required]
-        public MaintenanceTypeEnum MaintenanceType { get; set; } 
-        public int? TechnicianId { get; set; }
+        public MaintenanceTypeEnum MaintenanceType { get; set; }
 
+        public int? TechnicianId { get; set; }
         public string? Description { get; set; }
         public string? PartsUsed { get; set; }
         public MaintenancePriorityEnum? Priority { get; set; }
@@ -31,6 +29,11 @@ namespace FactoryOpsApp.Application.DTOs
         public DateTime PerformedOn { get; set; }
         public int TenantId { get; set; }
         public int? CreatedBy { get; set; }
+    }
+
+    public class UpdateMaintenanceHistoryDto : MaintenanceHistoryDto
+    {
+        public long MaintenanceId { get; set; }
         public int? UpdatedBy { get; set; }
     }
 

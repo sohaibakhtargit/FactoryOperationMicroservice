@@ -16,7 +16,7 @@ namespace FactoryOps_AccessManagementService.Controllers
         public IActionResult ThrowNullReference()
         {
             string? name = null;
-            var len = name.Length; // Null Reference Exception
+            var len = name.Length; 
             return Ok();
         }
 

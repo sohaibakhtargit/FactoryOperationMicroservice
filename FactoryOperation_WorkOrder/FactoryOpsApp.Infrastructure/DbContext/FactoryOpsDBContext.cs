@@ -17,12 +17,16 @@ public class FactoryOpsDBContext : DbContext
     public DbSet<FactoryTeam> FactoryTeams { get; set; }
     public DbSet<Location> Locations { get; set; }
 
-    
+    public DbSet<FactoryTeamMembers> FactoryTeamMembers { get; set; }
+    public DbSet<BulkImportFilesSamples> BulkImportFilesSamples { get; set; }
+
+
     public DbSet<AssetRegistry> AssetRegistry { get; set; }
     public DbSet<AssetTracking> AssetTracking { get; set; }
 
     public DbSet<MaintenanceSchedule> MaintenanceSchedules { get; set; }
     public DbSet<WorkOrder> WorkOrders { get; set; }
+    public DbSet<WorkOrderProgressUpdates> WorkOrderProgressUpdates {get; set; }
     public DbSet<WorkOrderBulkImport> WorkOrderBulkImports { get; set; }
     public DbSet<WorkOrderRequiredTool> WorkOrderRequiredTools { get; set; }
     public DbSet<MaintenanceTask> MaintenanceTasks { get; set; }
@@ -41,23 +45,34 @@ public class FactoryOpsDBContext : DbContext
     public DbSet<ReorderRule> ReorderRules { get; set; }
     public DbSet<PurchaseRequisition> PurchaseRequisitions { get; set; }
     public DbSet<MasterNotification> MasterNotifications { get; set; }
+    public DbSet<AssetBulkImport> AssetBulkImport { get; set; }
+    public DbSet<AssetBillOfMaterials> AssetBillOfMaterials { get; set; }
+    public DbSet<FactoryEventTrace> FactoryEventTraces { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
 
-        modelBuilder.Entity<FactoryUserRoles>()
-            .HasKey(ur => new { ur.UserId, ur.RoleId });
+        modelBuilder.Entity<FactoryUserRoles>(entity =>
+        {
+            entity.HasKey(ur => ur.UserRoleId);
 
-            modelBuilder.Entity<FactoryUserRoles>()
-                .HasOne(ur => ur.FactoryUsers)
-                .WithMany(u => u.FactoryUserRoles)
-                .HasForeignKey(ur => ur.UserId);
+            entity.Property(ur => ur.UserRoleId)
+                  .ValueGeneratedOnAdd();
 
-            modelBuilder.Entity<FactoryUserRoles>()
-                .HasOne(ur => ur.FactoryRoles)
-                .WithMany(r => r.FactoryUserRoles)
-                .HasForeignKey(ur => ur.RoleId);
+            entity.HasIndex(ur => new { ur.UserId, ur.RoleId })
+                  .IsUnique()
+                  .HasFilter("\"IsDeleted\" = false");
 
-            modelBuilder.Entity<FactoryTeam>()
+            entity.HasOne(ur => ur.FactoryUsers)
+                  .WithMany(u => u.FactoryUserRoles)
+                  .HasForeignKey(ur => ur.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(ur => ur.FactoryRoles)
+                  .WithMany(r => r.FactoryUserRoles)
+                  .HasForeignKey(ur => ur.RoleId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<FactoryTeam>()
                  .HasOne(ft => ft.Manager)                  
                  .WithMany()                               
                  .HasForeignKey(ft => ft.ManagerId)         
@@ -172,8 +187,20 @@ public class FactoryOpsDBContext : DbContext
                 .Property(w => w.WorkOrderType)
                 .HasConversion<string>()
                 .HasMaxLength(20);
+            modelBuilder.Entity<WorkOrder>()
+                .Property(w => w.UpdateType)
+                .HasConversion<string>()
+                .HasMaxLength(20);
 
-            modelBuilder.Entity<MaintenanceTask>()
+            modelBuilder.Entity<WorkOrderProgressUpdates>()
+                .Property(e => e.UpdateType)
+                .HasConversion<string>();
+
+           modelBuilder.Entity<WorkOrderProgressUpdates>()
+                .Property(e => e.Status)
+                .HasConversion<string>();
+
+        modelBuilder.Entity<MaintenanceTask>()
                 .Property(t => t.Status)
                 .HasConversion<string>()
                 .HasMaxLength(20);
@@ -293,7 +320,16 @@ public class FactoryOpsDBContext : DbContext
                 .Property(n => n.TriggerType)
                 .HasConversion<string>();
 
-        }
+        modelBuilder.Entity<FactoryEventTrace>(entity =>
+        {
+            entity.HasKey(x => x.TraceId);
+
+            entity.HasIndex(x => x.TenantId);
+            entity.HasIndex(x => x.Service);
+            entity.HasIndex(x => x.CreatedAt);
+        });
+
+    }
 
 }
  

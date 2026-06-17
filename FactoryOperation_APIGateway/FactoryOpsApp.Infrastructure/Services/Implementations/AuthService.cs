@@ -1,4 +1,5 @@
-﻿using FactoryOperation_API_Gateway.FactoryOpsApp.Application.Models;
+﻿using FactoryOperation_API_Gateway.Controllers;
+using FactoryOperation_API_Gateway.FactoryOpsApp.Application.Models;
 using FactoryOperation_API_Gateway.FactoryOpsApp.Infrastructure.Services.Interfaces;
 using System.Text;
 using System.Text.Json;
@@ -27,16 +28,28 @@ namespace FactoryOperation_API_Gateway.FactoryOpsApp.Infrastructure.Services.Imp
             return await _httpClient.PostAsync($"{authServiceUrl}/api/Authenticate/authenticate", content);
         }
 
-        public async Task<HttpResponseMessage> ForgetPasswordAsync(string email, string newPassword)
+        public async Task<HttpResponseMessage> ForgetPasswordAsync(string email)
         {
             var authServiceUrl = _configuration["Microservices:AccessManagement:BaseUrl"];
             var content = new StringContent(
-                JsonSerializer.Serialize(new { email, newPassword }),
+                JsonSerializer.Serialize(new { email }),
                 Encoding.UTF8,
                 "application/json");
 
-            return await _httpClient.PostAsync($"{authServiceUrl}/api/Authenticate/Forget-Password", content);
+            return await _httpClient.PostAsync($"{authServiceUrl}/api/Authenticate/forgot-password", content);
         }
+
+        public async Task<HttpResponseMessage> VerifyOtp(VerifyOTPDto otp)
+        {
+            var authServiceUrl = _configuration["Microservices:AccessManagement:BaseUrl"];
+            var content = new StringContent(
+                JsonSerializer.Serialize(new { otp.TenantId, otp.UserId,otp.Otp }),
+                Encoding.UTF8,
+                "application/json");
+
+            return await _httpClient.PostAsync($"{authServiceUrl}/api/Authenticate/verifyOtp", content);
+        }
+
 
         public async Task<HttpResponseMessage> SwitchTenantAsync(int tenantId, string token)
         {
@@ -51,6 +64,20 @@ namespace FactoryOperation_API_Gateway.FactoryOpsApp.Infrastructure.Services.Imp
             request.Content = content;
 
             return await _httpClient.SendAsync(request);
+        }
+
+        public async Task<HttpResponseMessage> ResetPasswordAsync(ResetPasswordDTO dto)
+        {
+            var authServiceUrl = _configuration["Microservices:AccessManagement:BaseUrl"];
+
+            var content = new StringContent(
+                JsonSerializer.Serialize(dto),
+                Encoding.UTF8,
+                "application/json");
+
+            return await _httpClient.PostAsync(
+                $"{authServiceUrl}/api/Authenticate/reset-password",
+                content);
         }
     }
 }

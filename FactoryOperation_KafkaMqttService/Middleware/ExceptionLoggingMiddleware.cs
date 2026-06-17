@@ -2,7 +2,7 @@
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.ExceptionLogger;
 using System.Net;
 using System.Text.Json;
-using static FactoryOperation_KafkaMqttService.FactoryOpsApp.Common.CommonConstant;
+using static FactoryOperation_KafkaMqttService.FactoryOpsApp.Common.CommonConstantFiles.CommonConstant;
 
 namespace FactoryOpsApp.Api.Middlewares
 {

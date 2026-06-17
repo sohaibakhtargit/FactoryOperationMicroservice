@@ -12,13 +12,17 @@ namespace FactoryOpsApp.Domain.Entities
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int Id { get; set; }
 
-        [Required]
-        public int WorkOrderId { get; set; }
+        public int? WorkOrderId { get; set; }
 
         [ForeignKey("WorkOrderId")]
-        public WorkOrder WorkOrder { get; set; }
+        public WorkOrder? WorkOrder { get; set; }
 
-        // Nullable, if user doesn’t select any tool
+
+        public int? ServiceRequestId { get; set; }
+
+        [ForeignKey("ServiceRequestId")]
+        public ServiceRequest? ServiceRequest { get; set; }
+
         public int? ToolId { get; set; }
 
         [ForeignKey("ToolId")]

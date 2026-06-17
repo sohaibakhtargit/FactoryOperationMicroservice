@@ -13,7 +13,7 @@ namespace FactoryOpsApp.Domain.Entities.MasterTenantsAdmin
     {
         [Key]
         public int Id { get; set; }
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Phone { get; set; }
@@ -24,7 +24,7 @@ namespace FactoryOpsApp.Domain.Entities.MasterTenantsAdmin
         public string? ProfileLogoUrl { get; set; }
         public string? Bio { get; set; }
 
-        public string PasswordHash { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
         [ForeignKey("AdminRoles")]
         public int RoleId { get; set; } 
         public AdminRoles AdminRoles { get; set; } = null!;
@@ -36,6 +36,9 @@ namespace FactoryOpsApp.Domain.Entities.MasterTenantsAdmin
         public int? UpdatedBy { get; set; }
         public DateTime? DeletedAt { get; set; }
         public int? DeletedBy { get; set; }
+        public string? OTPCode { get; set; }
+        public DateTime? OTPExpiry { get; set; }
+        public bool PasswordResetRequested { get; set; } = false;
 
     }
 }

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -7,27 +7,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="obj\Debug\net8.0\.NETCoreApp,Version=v8.0.AssemblyAttributes.cs" />
-    <Compile Include="obj\Debug\net8.0\FactoryOps_AccessManagementService.AssemblyInfo.cs" />
-    <Compile Include="obj\Debug\net8.0\FactoryOps_AccessManagementService.GlobalUsings.g.cs" />
+    <Compile Remove="DBBOT AI\**" />
+    <Content Remove="DBBOT AI\**" />
+    <EmbeddedResource Remove="DBBOT AI\**" />
+    <None Remove="DBBOT AI\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="obj\Debug\net8.0\rpswa.dswa.cache.json" />
-    <Content Include="obj\Debug\net8.0\staticwebassets.removed.txt" />
-    <Content Include="obj\FactoryOps_AccessManagementService.csproj.nuget.dgspec.json" />
-    <Content Include="obj\project.assets.json" />
-    <Content Include="Properties\launchSettings.json" />
+    <None Remove="FactoryOpsApp.Application\Templates\OtpEmail.html" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="obj\Debug\net8.0\FactoryOps_AccessManagementService.AssemblyInfoInputs.cache" />
-    <None Include="obj\Debug\net8.0\FactoryOps_AccessManagementService.assets.cache" />
-    <None Include="obj\Debug\net8.0\FactoryOps_AccessManagementService.csproj.AssemblyReference.cache" />
-    <None Include="obj\Debug\net8.0\FactoryOps_AccessManagementService.GeneratedMSBuildEditorConfig.editorconfig" />
-    <None Include="obj\FactoryOps_AccessManagementService.csproj.nuget.g.props" />
-    <None Include="obj\FactoryOps_AccessManagementService.csproj.nuget.g.targets" />
-    <None Include="obj\project.nuget.cache" />
+    <Content Include="FactoryOpsApp.Application\Templates\OtpEmail.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -51,9 +44,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="obj\Debug\net8.0\refint\" />
-    <Folder Include="obj\Debug\net8.0\ref\" />
-    <Folder Include="obj\Debug\net8.0\staticwebassets\" />
+    <Folder Include="wwwroot\" />
   </ItemGroup>
 
 </Project>

@@ -37,11 +37,14 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public int? TargetTeamId { get; set; }
 
         public bool IsRead { get; set; } = false;
+        public bool IsReadByTenant { get; set; } = false;
+
 
         public int? CreatedByUserId { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
+        public int? UpdatedBy { get; set; }
+        public DateTime? UpdatedAt { get; set; }
         public JsonDocument? AdditionalData { get; set; }
      
     }

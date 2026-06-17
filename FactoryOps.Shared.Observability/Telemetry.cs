@@ -1,0 +1,76 @@
+﻿using System.Diagnostics;
+using System.Diagnostics.Metrics;
+
+namespace FactoryOps.Shared.Observability;
+
+public static class Telemetry
+{
+    public const string SourceName = "FactoryOps.Messaging";
+
+    public static readonly ActivitySource Activity = new(SourceName);
+
+    public static readonly Meter Meter = new(SourceName, "1.0.0");
+
+    public static readonly Counter<long> MqttMessagesReceived =
+        Meter.CreateCounter<long>("mqtt.messages.received");
+
+    public static readonly Counter<long> MqttBytesReceived =
+        Meter.CreateCounter<long>("mqtt.bytes.received");
+
+    public static readonly Counter<long> MqttPublishes =
+        Meter.CreateCounter<long>("mqtt.messages.published");
+
+    public static readonly Counter<long> MqttPublishErrors =
+        Meter.CreateCounter<long>("mqtt.publish.errors");
+
+    public static readonly Counter<long> KafkaMessagesProduced =
+        Meter.CreateCounter<long>("kafka.messages.produced");
+
+    public static readonly Counter<long> KafkaProduceErrors =
+        Meter.CreateCounter<long>("kafka.produce.errors");
+
+    public static readonly Histogram<double> KafkaProduceLatencyMs =
+        Meter.CreateHistogram<double>("kafka.produce.latency.ms");
+
+    public static readonly Histogram<double> BridgeLatencyMs =
+        Meter.CreateHistogram<double>("bridge.endtoend.latency.ms");
+
+    public static readonly Counter<long> BridgeKafkaToMqttCounter =
+        Meter.CreateCounter<long>("bridge.kafka_to_mqtt.messages");
+
+
+    public static readonly Counter<long> BridgeKafkaToMqttErrors =
+        Meter.CreateCounter<long>("bridge.kafka_to_mqtt.errors");
+
+    public static readonly Histogram<double> ConsumerProcessingTimeMs =
+Meter.CreateHistogram<double>("consumer.processing.time.ms");
+
+    public static readonly Histogram<long> KafkaConsumerLag =
+        Meter.CreateHistogram<long>("kafka.consumer.lag");
+
+    public static readonly Counter<long> ConsumerMessagesProcessed =
+        Meter.CreateCounter<long>("consumer.messages.processed");
+
+    public static readonly Histogram<double> EndToEndLatencyMs =
+        Meter.CreateHistogram<double>("endtoend.latency.ms");
+
+    private static Func<int>? _bridgeDepthProvider;
+
+    static Telemetry()
+    {
+        Meter.CreateObservableGauge<long>(
+            name: "bridge.queue.depth",
+            observeValue: () =>
+            {
+                var v = (long)(_bridgeDepthProvider?.Invoke() ?? 0);
+                return new Measurement<long>(v);
+            },
+            unit: "messages",
+            description: "Number of MQTT messages waiting in the bridge channel");
+    }
+
+    public static void RegisterBridgeQueueDepth(Func<int> provider)
+    {
+        _bridgeDepthProvider = provider;
+    }
+}

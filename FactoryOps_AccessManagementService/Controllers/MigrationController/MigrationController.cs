@@ -26,13 +26,13 @@ namespace FactoryOps_AccessManagementService.Controllers.MigrationController
         /// </summary>
         /// <returns>Migration operation result</returns>
         /// <response code="200">Migration successfully applied</response>
-        [Authorize(Roles = "SuperAdmin")]
-        [HttpPost("apply-migration")]
-        public async Task<IActionResult> ApplyMigrationAsync()
-        {
-            var data = await _migrationService.ApplySchemaMigrationAsync();
-            return Ok(data);
-        }
+        //[Authorize(Roles = "SuperAdmin")]
+        //[HttpPost("apply-migration")]
+        //public async Task<IActionResult> ApplyMigrationAsync()
+        //{
+        //    var data = await _migrationService.ApplySchemaMigrationAsync();
+        //    return Ok(data);
+        //}
 
         /// <summary>
         /// Apply migration tenant-wise
@@ -41,12 +41,12 @@ namespace FactoryOps_AccessManagementService.Controllers.MigrationController
         /// <param name="TenantId">Tenant identifier</param>
         /// <returns>Migration operation result</returns>
         /// <response code="200">Tenant migration successfully applied</response>
-        [Authorize(Roles = "SuperAdmin")]
-        [HttpPost("apply-migration-TenantWise")]
-        public async Task<IActionResult> ApplyMigrationByTenantAsync(int TenantId)
-        {
-            var data = await _migrationService.ApplySchemaMigrationByTenantAsync(TenantId);
-            return Ok(data);
-        }
+        //[Authorize(Roles = "SuperAdmin")]
+        //[HttpPost("apply-migration-TenantWise")]
+        //public async Task<IActionResult> ApplyMigrationByTenantAsync(int TenantId)
+        //{
+        //    var data = await _migrationService.ApplySchemaMigrationByTenantAsync(TenantId);
+        //    return Ok(data);
+        //}
     }
 }

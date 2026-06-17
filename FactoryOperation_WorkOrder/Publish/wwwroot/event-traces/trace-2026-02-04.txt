@@ -1,0 +1,4 @@
+2026-02-04T04:56:52.5853365Z | Correlation=7e67ae0f-bd52-4660-ba82-a23cd120ef01 | Tenant=1 | Service=WorkOrderService | Stage=CREATED | Topic=N/A | Partition=N/A | Offset=N/A | Status=SUCCESS | Message=WO WO-2026-05e6 created
+2026-02-04T04:56:55.0854219Z | Correlation=7e67ae0f-bd52-4660-ba82-a23cd120ef01 | Tenant=1 | Service=WorkOrderService | Stage=PUBLISH_REQUESTED | Topic=factoryops.createworkorderasync.1.created | Partition=N/A | Offset=N/A | Status=SUCCESS | Message=N/A
+2026-02-04T05:46:42.9496733Z | Correlation=17b53392-aaf8-4200-95e4-3fd4618eecae | Tenant=1 | Service=WorkOrderService | Stage=CREATED | Topic=N/A | Partition=N/A | Offset=N/A | Status=SUCCESS | Message=WO WO-2026-8081 created
+2026-02-04T05:46:45.5775840Z | Correlation=17b53392-aaf8-4200-95e4-3fd4618eecae | Tenant=1 | Service=WorkOrderService | Stage=PUBLISH_REQUESTED | Topic=factoryops.createworkorderasync.1.created | Partition=N/A | Offset=N/A | Status=SUCCESS | Message=N/A

@@ -1,0 +1,6 @@
+AssetUniqueId,AssetName,AssetTypeId,Model,SerialNumber,CategoryHierarchy,LocationId,Status,AssignedTo,Department,Vendor,Supplier,Manufacturer,ExpectedLifespan,DepreciationRule,Power,Criticality,InsurancePolicyNumber,WarrantyExpiry
+H6-LY-2615,Hydraulic Wrench,10,,DH-28-O11A,,57,,21,,,,,,,,,,2026-01-06T06:07:36Z
+H6-LY-2715,Normal Wrench,10,,DH-28-O11B,,57,,21,,,,,,,,,,2026-01-06T06:07:36Z
+H6-LY-2815,Auomatic Wrench,10,,DH-28-O11C,,57,,21,,,,,,,,,,2026-01-06T06:07:36Z
+H6-LY-2915, Wrench,10,,DH-28-O11D,,57,,21,,,,,,,,,,2026-01-06T06:07:36Z
+H6-LY-3015,Multi Size Wrench,10,,DH-28-O11E,,57,,21,,,,,,,,,,2026-01-06T06:07:36Z

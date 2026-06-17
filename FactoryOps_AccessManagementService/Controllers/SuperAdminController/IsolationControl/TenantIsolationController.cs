@@ -19,7 +19,6 @@ namespace FactoryOps_AccessManagementService.Controllers.SuperAdminController.Is
         {
             _tenantIsolationService = tenantIsolationService;
         }
-
         /// <summary>
         /// Configure or update tenant isolation settings
         /// Establishes data isolation boundaries and security policies for tenant data segregation

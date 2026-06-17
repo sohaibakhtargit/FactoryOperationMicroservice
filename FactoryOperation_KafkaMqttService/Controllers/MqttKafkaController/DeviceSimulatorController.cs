@@ -1,5 +1,8 @@
 ﻿using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.DBContext;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Interfaces;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Interfaces;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Models;
+using FactoryOps.Shared.Observability;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,14 +20,19 @@ namespace FactoryOperation_KafkaMqttService.Controllers.MqttKafkaController
         private readonly TenantDbContextFactory _tenantDbFactory;
         private readonly ILogger<DeviceSimulatorController> _logger;
         private readonly ILastTelemetryStore _store;
+        private readonly IKafkaProducerService _kafkaProducer;
 
-
-        public DeviceSimulatorController(ILastTelemetryStore store, TenantDbContextFactory tenantDbFactory, IMqttClientService mqtt, ILogger<DeviceSimulatorController> logger)
+        public DeviceSimulatorController(ILastTelemetryStore store,
+            TenantDbContextFactory tenantDbFactory,
+            IMqttClientService mqtt,
+            ILogger<DeviceSimulatorController> logger,
+            IKafkaProducerService kafkaProducer)
         {
             _mqtt = mqtt;
             _logger = logger;
             _tenantDbFactory = tenantDbFactory;
             _store = store;
+            _kafkaProducer = kafkaProducer;
         }
 
 
@@ -83,6 +91,30 @@ namespace FactoryOperation_KafkaMqttService.Controllers.MqttKafkaController
             int QoS = 1,
             bool Retain = false
         );
+
+        [HttpPost("publish-invalid")]
+        public async Task<IActionResult> PublishInvalid(
+       [FromQuery] string deviceId = "DEV001",
+       CancellationToken ct = default)
+        {
+            var topic = $"tenant/1/devices/{deviceId}/telemetry";
+
+            if (!_mqtt.IsConnected)
+                await _mqtt.ConnectAsync(ct);
+
+            // 🔥 Intentionally invalid payload
+            var invalidPayload = Encoding.UTF8.GetBytes("INVALID_PAYLOAD_TEST");
+
+            await _mqtt.PublishAsync(topic, invalidPayload, qos: 1, retain: false, ct);
+
+            _logger.LogWarning("Invalid payload published to topic {Topic}", topic);
+
+            return Ok(new
+            {
+                message = "Invalid payload sent successfully",
+                topic
+            });
+        }
 
         [HttpPost("publish-burst")]
         public async Task<IActionResult> PublishBurst([FromBody] BurstRequest req, CancellationToken ct)
@@ -156,7 +188,16 @@ namespace FactoryOperation_KafkaMqttService.Controllers.MqttKafkaController
         }
 
         public record PublishByTopicIdDto(int TenantId, int TopicId, string DeviceCode, string Payload);
+        public class PublishByDeviceIdDto
+        {
+            public int TenantId { get; set; }
 
+            public int DeviceId { get; set; }
+
+            public int TopicId { get; set; }
+
+            public string Payload { get; set; } = string.Empty;
+        }
         // POST /api/iot/publish-by-topicId
         [HttpPost("publish-by-topicId")]
         public async Task<IActionResult> PublishByTopicId([FromBody] PublishByTopicIdDto dto, CancellationToken ct)
@@ -179,6 +220,72 @@ namespace FactoryOperation_KafkaMqttService.Controllers.MqttKafkaController
             if (!_mqtt.IsConnected) await _mqtt.ConnectAsync(ct);
             await _mqtt.PublishAsync(mqttPath, Encoding.UTF8.GetBytes(dto.Payload ?? string.Empty), qos: 1, retain: false, ct);
             return Accepted(new { topic = mqttPath });
+        }
+
+        // POST /api/iot/publish-by-deviceId
+        [HttpPost("publish-by-deviceId")]
+        public async Task<IActionResult> PublishByDeviceId(
+            [FromBody] PublishByDeviceIdDto dto,
+            CancellationToken ct)
+        {
+            await using var db = _tenantDbFactory.GetTenantDbContext(dto.TenantId);
+
+            // 1️⃣ Get Device
+            var device = await db.FactoryDevices
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d =>
+                    d.DeviceId == dto.DeviceId &&
+                    d.TenantId == dto.TenantId &&
+                    !d.IsDeleted,
+                    ct);
+
+            if (device == null)
+                return NotFound("Device not found.");
+
+            // 2️⃣ Validate DeviceTopic Mapping
+            var deviceTopic = await db.FactoryDeviceTopics
+                .Include(x => x.Topic)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.DeviceId == dto.DeviceId &&
+                    x.TopicId == dto.TopicId &&
+                    x.TenantId == dto.TenantId &&
+                    x.IsActive &&
+                    !x.IsDeleted,
+                    ct);
+
+            if (deviceTopic == null)
+                return NotFound("Device is not mapped to this topic.");
+
+            var topic = deviceTopic.Topic;
+
+            if (topic == null || string.IsNullOrWhiteSpace(topic.MqttPath))
+                return BadRequest("Invalid MQTT topic configuration.");
+
+            // 3️⃣ Replace placeholders
+            var mqttPath = topic.MqttPath
+                .Replace("{TenantId}", dto.TenantId.ToString(), StringComparison.OrdinalIgnoreCase)
+                .Replace("{deviceCode}", device.DeviceCode, StringComparison.OrdinalIgnoreCase)
+                .Replace("{device}", device.DeviceCode, StringComparison.OrdinalIgnoreCase);
+
+            // 4️⃣ Publish to MQTT
+            if (!_mqtt.IsConnected)
+                await _mqtt.ConnectAsync(ct);
+
+            await _mqtt.PublishAsync(
+                mqttPath,
+                Encoding.UTF8.GetBytes(dto.Payload ?? string.Empty),
+                qos: topic.QoS,
+                retain: false,
+                ct);
+
+            return Accepted(new
+            {
+                deviceId = device.DeviceId,
+                deviceCode = device.DeviceCode,
+                topicId = topic.TopicId,
+                topic = mqttPath
+            });
         }
 
         [HttpGet("last5")]
@@ -243,5 +350,53 @@ namespace FactoryOperation_KafkaMqttService.Controllers.MqttKafkaController
                 try { return Encoding.UTF8.GetString(bytes); } catch { return null; }
             }
         }
+
+        [HttpPost("ping")]
+        public IActionResult Ping()
+        {
+            AppMetrics.RequestCounter.Add(1);
+
+            return Ok("Metric emitted");
+        }
+
+
+        [HttpPost("kafka-test")]
+        public async Task<IActionResult> KafkaToMqttTest()
+        {
+            var messageId = Guid.NewGuid().ToString("N");
+
+            var envelope = new KafkaMessageEnvelope
+            {
+                MessageId = messageId,
+                CorrelationId = messageId,
+
+                EventType = "TestEvent",
+                Producer = "ManualTest",
+
+                TenantId = 78,
+
+                Key = $"78_DEV99_{messageId}",
+
+                Payload = new
+                {
+                    payloadBase64 = Convert.ToBase64String(
+                        Encoding.UTF8.GetBytes("Hello from Kafka Test"))
+                },
+
+                Headers = new Dictionary<string, string>
+                {
+                    ["tenant-id"] = "78",
+                    ["device-code"] = "DEV99",
+                    ["event-type"] = "TestEvent"
+                }
+            };
+
+            await _kafkaProducer.ProduceEnvelopeAsync(
+                "factoryops.78.devices.DEV99.telemetry",
+                envelope);
+
+            return Ok("Kafka message sent");
+        }
+
     }
 }

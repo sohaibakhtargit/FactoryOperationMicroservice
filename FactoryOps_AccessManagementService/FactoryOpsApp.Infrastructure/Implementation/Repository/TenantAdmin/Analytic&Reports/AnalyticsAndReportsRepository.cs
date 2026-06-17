@@ -84,7 +84,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                     case CategoryType.All:
                     default:
-                        // Reuse calculated counts
+                        
                         int totalSchedulesAll = schedules.Count();
                         int completedTasksAll = tasks.Count(t => t.Status == MaintenanceTaskStatus.Completed);
                         int totalFailures = workOrders.Count(w => w.Status == WorkOrderStatus.Cancelled || w.Status == WorkOrderStatus.Overdue);
@@ -95,7 +95,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         result.TotalDowntimeHours = workOrders.Sum(x => x.EstimatedDurationMinutes) / 60.0;
                         result.MTBF = totalFailures > 0 ? totalOpTime / totalFailures : totalOpTime;
 
-                        // Metrics distribution calculation in %
+                        
                         decimal sumMetrics = (decimal)result.TotalCost + (decimal)result.ComplianceRate + (decimal)result.TotalDowntimeHours + (decimal)result.MTBF;
                         result.MetricsDistribution = new MetricsDistributionsDto
                         {
@@ -111,7 +111,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 result.MaintenanceTasksCount = tasks.Count;
                 result.MaintenanceSchedules = schedules.Count;
                 result.Category = category;
-                // result.AlertNotificationsCount = alerts.Count;
+                
 
                 response.GetAllData = new List<AnalyticsAndReportsDto> { result };
                 response.StatusCode = StatusCode.Success;
@@ -144,7 +144,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 var page = document.AddPage();
                 var gfx = XGraphics.FromPdfPage(page);
 
-                // Fonts
+             
                 var titleFont = new XFont("Arial", 16, XFontStyle.Bold);
                 var headerFont = new XFont("Arial", 10, XFontStyle.Bold);
                 var bodyFont = new XFont("Arial", 10, XFontStyle.Regular);

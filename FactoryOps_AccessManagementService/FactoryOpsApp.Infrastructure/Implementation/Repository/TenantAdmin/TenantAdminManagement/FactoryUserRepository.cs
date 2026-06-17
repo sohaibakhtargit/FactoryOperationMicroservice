@@ -3,31 +3,37 @@ using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfa
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Common;
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.ExceptionLogger;
 using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Common;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.Security;
 using FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using FactoryOpsApp.Domain.Entities.MasterTenantsAdmin;
 using FactoryOpsApp.Infrastructure.DBContext;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 using System.Text.Json;
+using System.Transactions;
 using static FactoryOps_AccessManagementService.FactoryOpsApp.Common.CommonConstant;
 
 namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Repository.TenantAdmin.TenantAdminManagement
 {
     public class FactoryUserRepository : IFactoryUserRepository
     {
+        private readonly IPasswordHasher _hasher;
         private readonly MasterFactoryOpsDbContext _masterDbcontext;
         private readonly TenantDbContextFactory _tenantDbContext;
         private readonly IEmailService _iEmailService;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IExceptionLoggerService _exceptionLogger;
         private readonly IAuditLogService _auditLogger;
+        private readonly IConnectionMultiplexer _redis;
         public FactoryUserRepository(MasterFactoryOpsDbContext masterDbcontext,
             IHttpContextAccessor httpContextAccessor,
             TenantDbContextFactory tenantDbContext,
             IEmailService iEmailService,
             IExceptionLoggerService exceptionLogger,
-            IAuditLogService auditLogger
-
+            IAuditLogService auditLogger,
+            IPasswordHasher hasher,
+            IConnectionMultiplexer redis
             )
         {
             _masterDbcontext = masterDbcontext;
@@ -36,6 +42,8 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             _iEmailService = iEmailService;
             _exceptionLogger = exceptionLogger;
             _auditLogger = auditLogger;
+            _hasher = hasher;
+            _redis = redis;
         }
 
         public async Task<CommonResponseModel> AddNewUser(UserResponseDto AddUser)
@@ -44,14 +52,30 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             int? createdUserId = null;
             using var tenantDb = _tenantDbContext.GetTenantDbContext(AddUser.TenantId);
             var existingUser = await tenantDb.FactoryUsers
-                .FirstOrDefaultAsync(u => (u.Email == AddUser.Email || u.Username == AddUser.Username)
-                                            && u.IsDeleted == false
-                                            && u.IsActive == true);
+      .Where(u => !u.IsDeleted &&
+             (u.Email == AddUser.Email ||
+              u.Username == AddUser.Username ||
+              u.ContactNumber == AddUser.ContactNumber))
+      .ToListAsync();
 
-            if (existingUser != null)
+            if (existingUser.Any(u => u.Email == AddUser.Email))
             {
                 response.StatusCode = StatusCode.BadRequest;
-                response.StatusMessage = FactoryUserStatusMessage.UserAlreadyExists;
+                response.StatusMessage = FactoryUserStatusMessage.EmailAlreadyExists;
+                return response;
+            }
+
+            if (existingUser.Any(u => u.Username == AddUser.Username))
+            {
+                response.StatusCode = StatusCode.BadRequest;
+                response.StatusMessage = FactoryUserStatusMessage.UsernameAlreadyExists;
+                return response;
+            }
+
+            if (existingUser.Any(u => u.ContactNumber == AddUser.ContactNumber))
+            {
+                response.StatusCode = StatusCode.BadRequest;
+                response.StatusMessage = FactoryUserStatusMessage.PhoneAlreadyExists;
                 return response;
             }
 
@@ -74,7 +98,8 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             }
 
             using var transaction = await tenantDb.Database.BeginTransactionAsync();
-
+            var tempPassword = AddUser.FirstName + "@123";
+            var hashedPassowrd = _hasher.Hash(tempPassword);   
             try
             {
                 var user = new FactoryUsers
@@ -84,7 +109,8 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     LastName = AddUser.LastName,
                     Username = AddUser.Username,
                     Email = AddUser.Email,
-                    PasswordHash = AddUser.FirstName + "@123",
+                    //PasswordHash = AddUser.FirstName + "@123",
+                    PasswordHash = hashedPassowrd,
                     ContactNumber = AddUser.ContactNumber,
                     MFAEnabled = AddUser.MFAEnabled,
                     CreatedAt = DateTime.UtcNow,
@@ -127,9 +153,9 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 {
                     TenantId = AddUser.TenantId,
                     Email = AddUser.Email,
-                    Password = AddUser.FirstName + "@123",
+                    Password = hashedPassowrd,
                     Status = UserStatus.Active,
-                    IpAddress = ctx?.Connection.RemoteIpAddress?.ToString(),
+                    IpAddress = ctx?.Connection.RemoteIpAddress?.ToString()?? "N/A",
                     Roles = rolesJson,
                     RoleId = role.RoleId,
                     Suspend = false,
@@ -156,14 +182,15 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 var emailDto = new EmailDTO
                 {
                     From = "shoaibmaliklenovo@gmail.com",
-                    To = "factory.operation@yopmail.com", //replace with actual email after prod
+                    To = AddUser.Email ?? "factory.operation@yopmail.com",
                     Subject = "Your New Account Credentials",
                     Body = $@"<html>
                     <body>
                         <h2>Welcome, {AddUser.FirstName}+{AddUser.LastName}!</h2>
                         <p>Your account has been successfully created.</p>
                         <p><strong>Username:</strong> {AddUser.Username}</p>
-                        <p><strong>Temporary Password:</strong> {AddUser.FirstName + "@123"}</p>
+                        <p><strong>Email:</strong> {AddUser.Email}</p>
+                        <p><strong>Temporary Password:</strong> {tempPassword}</p>
                         <p>Please change your password after first login.</p>
                     </body>
                     </html>"
@@ -198,15 +225,19 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             return response;
         }
 
-        //Softdelete and update existing user
         public async Task<CommonResponseModel> EditExistingUser(UserResponseDto EditUser)
         {
             CommonResponseModel response = new CommonResponseModel();
+
+            using var tenantDb = _tenantDbContext.GetTenantDbContext(EditUser.TenantId);
+
+            await using var tenantTx = await tenantDb.Database.BeginTransactionAsync();
+            await using var masterTx = await _masterDbcontext.Database.BeginTransactionAsync();
+
             try
             {
-                using var tenantDb = _tenantDbContext.GetTenantDbContext(EditUser.TenantId);
                 var existingUser = await tenantDb.FactoryUsers
-                    .FirstOrDefaultAsync(u => u.UserId == EditUser.UserId && u.IsDeleted == false);
+                    .FirstOrDefaultAsync(u => u.UserId == EditUser.UserId && !u.IsDeleted);
 
                 if (existingUser == null)
                 {
@@ -216,27 +247,41 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 }
 
                 bool emailExists = await tenantDb.FactoryUsers
-                    .AnyAsync(u => u.Email == EditUser.Email && u.UserId != EditUser.UserId && !u.IsDeleted);
+                    .AnyAsync(u => u.Email == EditUser.Email &&
+                                   u.UserId != EditUser.UserId &&
+                                   !u.IsDeleted);
+
                 if (emailExists)
                 {
                     response.StatusCode = StatusCode.BadRequest;
-                    response.StatusMessage = FactoryUserStatusMessage.UserAlreadyExists;
+                    response.StatusMessage = FactoryUserStatusMessage.EmailAlreadyExists;
                     return response;
                 }
 
                 bool usernameExists = await tenantDb.FactoryUsers
-                    .AnyAsync(u => u.Username == EditUser.Username && u.UserId != EditUser.UserId && !u.IsDeleted);
+                    .AnyAsync(u => u.Username == EditUser.Username &&
+                                   u.UserId != EditUser.UserId &&
+                                   !u.IsDeleted);
+
                 if (usernameExists)
                 {
                     response.StatusCode = StatusCode.BadRequest;
-                    response.StatusMessage = response.StatusMessage = FactoryUserStatusMessage.UserAlreadyExists;
-                    ;
+                    response.StatusMessage = FactoryUserStatusMessage.UsernameAlreadyExists;
                     return response;
                 }
 
-                var ctx = _httpContextAccessor.HttpContext;
+                bool contactExists = await tenantDb.FactoryUsers
+                    .AnyAsync(u => u.ContactNumber == EditUser.ContactNumber &&
+                                   u.UserId != EditUser.UserId &&
+                                   !u.IsDeleted);
 
-                var originalUserName = existingUser.Username;
+                if (contactExists)
+                {
+                    response.StatusCode = StatusCode.BadRequest;
+                    response.StatusMessage = FactoryUserStatusMessage.PhoneAlreadyExists;
+                    return response;
+                }
+
                 var originalUserEmail = existingUser.Email;
 
                 existingUser.FirstName = EditUser.FirstName;
@@ -250,7 +295,6 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 existingUser.IsActive = true;
                 existingUser.IsDeleted = false;
 
-                // Soft delete previous role
                 var existingUserRole = await tenantDb.FactoryUserRoles
                     .FirstOrDefaultAsync(r => r.UserId == EditUser.UserId && r.IsActive && !r.IsDeleted);
 
@@ -272,6 +316,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                             CreatedAt = DateTime.UtcNow,
                             CreatedBy = EditUser.TenantId
                         };
+
                         await tenantDb.FactoryUserRoles.AddAsync(newUserRole);
                     }
                     else
@@ -291,6 +336,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         CreatedAt = DateTime.UtcNow,
                         CreatedBy = EditUser.TenantId
                     };
+
                     await tenantDb.FactoryUserRoles.AddAsync(newUserRole);
                 }
 
@@ -306,7 +352,10 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 }
 
                 var globalUser = await _masterDbcontext.GlobalUsers
-                    .FirstOrDefaultAsync(g => g.Email == originalUserEmail && g.TenantId == EditUser.TenantId && !g.IsDeleted);
+                    .FirstOrDefaultAsync(g =>
+                        g.Email == originalUserEmail &&
+                        g.TenantId == EditUser.TenantId &&
+                        !g.IsDeleted);
 
                 if (globalUser != null)
                 {
@@ -328,11 +377,17 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 await tenantDb.SaveChangesAsync();
                 await _masterDbcontext.SaveChangesAsync();
 
+                await masterTx.CommitAsync();
+                await tenantTx.CommitAsync();
+
                 response.StatusCode = StatusCode.Success;
                 response.StatusMessage = FactoryUserStatusMessage.UserUpdated;
             }
             catch (Exception ex)
             {
+                await masterTx.RollbackAsync();
+                await tenantTx.RollbackAsync();
+
                 await _exceptionLogger.LogExceptionAsync(
                     ex,
                     sourceModule: "UserManagement",
@@ -340,12 +395,14 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     tenantId: EditUser.TenantId,
                     userId: EditUser.UserId
                 );
+
                 response.StatusCode = StatusCode.Error;
                 response.StatusMessage = $"{FactoryUserStatusMessage.UserUpdateFailed}: {ex.Message}";
             }
 
             return response;
         }
+
         public GetAllRecord<GetUsersListDto> GetAllUsers(int TenantId)
         {
             GetAllRecord<GetUsersListDto> response = new();
@@ -371,7 +428,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                                     RoleId = role.RoleId,
                                     Role = role.RoleName,
                                     ContactNumber = user.ContactNumber,
-                                    AddressLine1 = user.AddressLine1,
+                                    AddressLine1 = user.AddressLine1!,
                                     AddressLine2 = user.AddressLine2,
                                     Status = user.Status,
                                     ForceLogout = user.ForceLogout,
@@ -401,7 +458,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         public async Task<CommonResponseModel> DeleteUser(int Id, int TenantId)
         {
             CommonResponseModel response = new CommonResponseModel();
+
             using var tenantDb = _tenantDbContext.GetTenantDbContext(TenantId);
+
+            await using var tenantTx = await tenantDb.Database.BeginTransactionAsync();
+            await using var masterTx = await _masterDbcontext.Database.BeginTransactionAsync();
 
             try
             {
@@ -419,8 +480,8 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 existingUser.IsActive = false;
 
                 var userRoles = await tenantDb.FactoryUserRoles
-                              .Where(r => r.UserId == Id && !r.IsDeleted)
-                              .ToListAsync();
+                    .Where(r => r.UserId == Id && !r.IsDeleted)
+                    .ToListAsync();
 
                 foreach (var role in userRoles)
                 {
@@ -429,8 +490,8 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 }
 
                 var userGroups = await tenantDb.FactoryGroupUsers
-                        .Where(g => g.UserId == Id && !g.IsDeleted)
-                        .ToListAsync();
+                    .Where(g => g.UserId == Id && !g.IsDeleted)
+                    .ToListAsync();
 
                 foreach (var group in userGroups)
                 {
@@ -438,9 +499,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     group.IsActive = false;
                 }
 
-
                 var existingGlobalUser = await _masterDbcontext.GlobalUsers
-                    .FirstOrDefaultAsync(u => u.Email == existingUser.Email && u.TenantId == TenantId && !u.IsDeleted);
+                    .FirstOrDefaultAsync(u =>
+                        u.Email == existingUser.Email &&
+                        u.TenantId == TenantId &&
+                        !u.IsDeleted);
 
                 if (existingGlobalUser != null)
                 {
@@ -449,21 +512,27 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 }
 
                 await _auditLogger.LogAuditAsync(
-                     action: "Delete",
-                     details: $"User '{existingUser.Email}' deleted",
-                     tenantId: TenantId,
-                     email: existingUser.Email,
-                     eventType: "UserDelete"
-                 );
+                    action: "Delete",
+                    details: $"User '{existingUser.Email}' deleted",
+                    tenantId: TenantId,
+                    email: existingUser.Email,
+                    eventType: "UserDelete"
+                );
 
-                await _masterDbcontext.SaveChangesAsync();
                 await tenantDb.SaveChangesAsync();
+                await _masterDbcontext.SaveChangesAsync();
+
+                await masterTx.CommitAsync();
+                await tenantTx.CommitAsync();
 
                 response.StatusCode = StatusCode.Success;
                 response.StatusMessage = FactoryUserStatusMessage.UserDeleted;
             }
             catch (Exception ex)
             {
+                await masterTx.RollbackAsync();
+                await tenantTx.RollbackAsync();
+
                 await _exceptionLogger.LogExceptionAsync(
                     ex,
                     sourceModule: "UserManagement",
@@ -471,12 +540,14 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     tenantId: TenantId,
                     userId: Id
                 );
+
                 response.StatusCode = StatusCode.Error;
                 response.StatusMessage = $"{FactoryUserStatusMessage.UserDeleteFailed}: {ex.Message}";
             }
 
             return response;
         }
+
         public async Task<CommonResponseModel> ForceLogout(int Id, int TenantId)
         {
             CommonResponseModel response = new CommonResponseModel();
@@ -530,6 +601,13 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 await _masterDbcontext.SaveChangesAsync();
                 await tenantDb.SaveChangesAsync();
+
+
+                // Redis Cache Clear
+                var redisDb = _redis.GetDatabase();
+                string cacheKey = $"user-status:{TenantId}:{Id}";
+                await redisDb.KeyDeleteAsync(cacheKey);
+
                 response.StatusCode = StatusCode.Success;
                 response.StatusMessage = FactoryUserStatusMessage.UserForceLogout;
 
@@ -619,6 +697,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     await tenantDb.SaveChangesAsync();
                     await _masterDbcontext.SaveChangesAsync();
                     await transaction.CommitAsync();
+
+                    // Redis Cache Clear
+                    var redisDb = _redis.GetDatabase();
+                    string cacheKey = $"user-status:{dto.TenantId}:{dto.UserId}";
+                    await redisDb.KeyDeleteAsync(cacheKey);
 
                     response.StatusCode = StatusCode.Success;
                     response.StatusMessage = $"User {auditAction.ToLower()}ed successfully";

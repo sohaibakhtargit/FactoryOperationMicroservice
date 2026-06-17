@@ -2,11 +2,10 @@
 using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.WorkOrderServices;
 using FactoryOpsApp.Application.Common;
 using FactoryOpsApp.Application.DTOs;
-using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 
 namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Services.TenantAdmin.WorkOrderManagement
 {
-    public class ServiceRequestService: IServiceRequestService
+    public class ServiceRequestService : IServiceRequestService
     {
         private readonly IServiceRequestRepository _repository;
 
@@ -15,7 +14,7 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
             _repository = repository;
         }
 
-        public Task<CommonResponseModel> CreateServiceRequestAsync(ServiceRequestDto dto)
+        public Task<CommonServiceRequestResponseModel> CreateServiceRequestAsync(ServiceRequestDto dto)
         {
             return _repository.CreateServiceRequestAsync(dto);
         }
@@ -54,5 +53,29 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
         {
             return _repository.GetOverdueServiceRequestsAsync(tenantId);
         }
+
+        public Task<CommonResponseModel> ApproveServiceRequestAsync(ApproveServiceRequestDto dto)
+        {
+            return _repository.ApproveServiceRequestAsync(dto);
+        }
+        public Task<CommonResponseModel> RejectServiceRequestAsync(RejectServiceRequestDto dto)
+        {
+            return _repository.RejectServiceRequestAsync(dto);
+        }
+
+        public Task<CommonResponseModel> AssignServiceRequestAsync(AssignServiceRequestDto dto)
+        {
+            return _repository.AssignServiceRequestAsync(dto);
+        }
+        public Task<CommonResponseModel> ReopenServiceRequestAsync(ServiceRequestDto dto)
+        {
+            return _repository.ReopenServiceRequestAsync(dto);
+        }
+
+        public Task<CommonResponseModel> UploadServiceRequestMediaAsync(ServiceRequestMediaDto dto)
+        {
+           return _repository.UploadServiceRequestMediaAsync(dto);
+        }
+
     }
 }

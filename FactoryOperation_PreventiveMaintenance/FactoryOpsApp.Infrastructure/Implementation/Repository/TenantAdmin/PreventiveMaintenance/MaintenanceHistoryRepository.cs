@@ -5,7 +5,6 @@ using FactoryOpsApp.Application.Interfaces.Services.SuperAdmin.AuditLogs;
 using Microsoft.EntityFrameworkCore;
 using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using FactoryOpsApp.Infrastructure.DBContext;
-using Microsoft.EntityFrameworkCore;
 using static FactoryOpsApp.Common.CommonConstant;
 using FactoryOperation_PreventiveMaintenance.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.ExceptionLogger;
 
@@ -25,6 +24,7 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.PreventiveMaintena
             _auditLogger = auditLogger;
             _exceptionLogger = exceptionLogger;
         }
+
         public async Task<CommonResponseModel> AddMaintenanceHistoryAsync(MaintenanceHistoryDto dto)
         {
             try
@@ -36,7 +36,7 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.PreventiveMaintena
                     AssetId = dto.AssetId,
                     WorkOrderId = dto.WorkOrderId,
                     TenantId = dto.TenantId,
-                    Technician  = dto.TechnicianId,
+                    Technician = dto.TechnicianId,
                     MaintenanceType = dto.MaintenanceType,
                     Description = dto.Description,
                     PartsUsed = dto.PartsUsed,
@@ -51,20 +51,32 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.PreventiveMaintena
                     CreatedBy = dto.CreatedBy
                 };
 
+                if (dto.MaintenanceType == MaintenanceTypeEnum.Corrective)
+                {
+                    entity.FailureReportedOn = DateTime.UtcNow;
+                }
+
                 await tenantDb.MaintenanceHistory.AddAsync(entity);
                 await tenantDb.SaveChangesAsync();
 
-                await _auditLogger.LogAuditAsync("Create", $"Created Maintenance Record '{entity.WorkOrderId}'", dto.TenantId, "", "AddMaintenanceHistoryAsync");
-
-                return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = MaintenanceHistoryStatusMessage.CreateSuccess };
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Success,
+                    StatusMessage = MaintenanceHistoryStatusMessage.CreateSuccess
+                };
             }
             catch (Exception ex)
             {
                 await _exceptionLogger.LogExceptionAsync(ex, "Maintenance-Module", "AddMaintenanceHistoryAsync", dto.TenantId, null);
-                return new CommonResponseModel { StatusCode = StatusCode.Error  , StatusMessage = $"{MaintenanceHistoryStatusMessage.CreateFailed}: {ex.Message}" };
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Error,
+                    StatusMessage = $"{MaintenanceHistoryStatusMessage.CreateFailed}: {ex.Message}"
+                };
             }
         }
-        public async Task<CommonResponseModel> UpdateMaintenanceHistoryAsync(MaintenanceHistoryDto dto)
+
+        public async Task<CommonResponseModel> UpdateMaintenanceHistoryAsync(UpdateMaintenanceHistoryDto dto)
         {
             try
             {
@@ -74,13 +86,12 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.PreventiveMaintena
                     .FirstOrDefaultAsync(m => m.MaintenanceId == dto.MaintenanceId && !m.IsDeleted);
 
                 if (entity == null)
-                    return new CommonResponseModel { StatusCode = StatusCode.NotFound, StatusMessage = MaintenanceHistoryStatusMessage.NotFound };
+                    return new CommonResponseModel
+                    {
+                        StatusCode = StatusCode.NotFound,
+                        StatusMessage = MaintenanceHistoryStatusMessage.NotFound
+                    };
 
-                entity.AssetId = dto.AssetId;
-                entity.TenantId = dto.TenantId;
-                entity.WorkOrderId = dto.WorkOrderId;
-                entity.Technician = dto.TechnicianId;
-                entity.MaintenanceType = dto.MaintenanceType;
                 entity.Description = dto.Description;
                 entity.PartsUsed = dto.PartsUsed;
                 entity.Priority = dto.Priority;
@@ -91,17 +102,46 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.PreventiveMaintena
                 entity.UpdatedAt = DateTime.UtcNow;
                 entity.UpdatedBy = dto.UpdatedBy;
 
-                await tenantDb.SaveChangesAsync();
-                await _auditLogger.LogAuditAsync("Update", $"Updated Maintenance Record '{entity.WorkOrderId}'", dto.TenantId, "", "UpdateMaintenanceHistoryAsync");
+                if (entity.MaintenanceType == MaintenanceTypeEnum.Corrective &&
+                    entity.FailureReportedOn.HasValue &&
+                    !entity.RepairCompletedOn.HasValue)
+                {
+                    entity.RepairCompletedOn = DateTime.UtcNow;
 
-                return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = MaintenanceHistoryStatusMessage.UpdateSuccess };
+                    // -------- MTTR --------
+                    var repairMinutes =
+                        (entity.RepairCompletedOn.Value - entity.FailureReportedOn.Value).TotalMinutes;
+
+                    entity.MTTR = repairMinutes > 0 ? (decimal)repairMinutes : 0;
+
+                    // -------- MTBF --------
+                    entity.MTBF = await CalculateMTBFAsync(
+                        dto.TenantId,
+                        entity.AssetId
+                    );
+                }
+
+                await tenantDb.SaveChangesAsync();
+
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Success,
+                    StatusMessage = MaintenanceHistoryStatusMessage.UpdateSuccess
+                };
             }
             catch (Exception ex)
             {
                 await _exceptionLogger.LogExceptionAsync(ex, "Maintenance-Module", "UpdateMaintenanceHistoryAsync", dto.TenantId, null);
-                return new CommonResponseModel { StatusCode = StatusCode.Error, StatusMessage = $"{MaintenanceHistoryStatusMessage.UpdateFailed}: {ex.Message}" };
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Error,
+                    StatusMessage = $"{MaintenanceHistoryStatusMessage.UpdateFailed}: {ex.Message}"
+                };
             }
         }
+
+
+
         public async Task<CommonResponseModel> DeleteMaintenanceHistoryAsync(long maintenanceId, int tenantId)
         {
             try
@@ -360,8 +400,13 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.PreventiveMaintena
                 var metrics = new MaintenanceMetricsDto
                 {
                     TenantId = tenantId,
-                    AvgMTBF = maintenanceRecords.Average(m => m.MTBF ?? 0),
-                    AvgMTTR = maintenanceRecords.Average(m => m.MTTR ?? 0),
+                    AvgMTBF = maintenanceRecords.Any(m => m.MTBF.HasValue)
+                        ? maintenanceRecords.Where(m => m.MTBF.HasValue).Average(m => m.MTBF.Value)
+                        : 0,
+                     AvgMTTR = maintenanceRecords.Any(m => m.MTTR.HasValue)
+                        ? maintenanceRecords.Where(m => m.MTTR.HasValue).Average(m => m.MTTR.Value)
+                        : 0,
+
                     TotalCost = maintenanceRecords.Sum(m => m.Cost ?? 0),
                     Efficiency = completedCount > 0 ? (decimal)completedCount / (completedCount + inProgressCount) * 100 : 0,
                     TotalMaintenanceCount = maintenanceRecords.Count,
@@ -385,6 +430,37 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.PreventiveMaintena
                     StatusMessage = $"{MaintenanceHistoryStatusMessage.MetricsFetchFailed}: {ex.Message}"
                 };
             }
+        }
+
+        private async Task<decimal> CalculateMTBFAsync(int tenantId,int assetId)
+        {
+                    using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+                    var failureCount = await tenantDb.MaintenanceHistory
+                .CountAsync(m =>
+                    m.AssetId == assetId &&
+                    m.MaintenanceType == MaintenanceTypeEnum.Corrective &&
+                    !m.IsDeleted);
+
+            if (failureCount == 0)
+                return 0;
+
+            var totalDowntimeMinutes = await tenantDb.AssetTracking
+                .Where(a => a.AssetId == assetId && a.TotalDownMinutes != null)
+                .SumAsync(a => a.TotalDownMinutes.Value);
+
+            var assetCreatedAt = await tenantDb.AssetRegistry
+                .Where(a => a.AssetId == assetId)
+                .Select(a => a.CreatedAt)
+                .FirstAsync();
+
+            var totalTimeMinutes =
+                (DateTime.UtcNow - assetCreatedAt).TotalMinutes;
+
+            var operatingMinutes = totalTimeMinutes - totalDowntimeMinutes;
+
+            return operatingMinutes > 0
+                ? (decimal)(operatingMinutes / failureCount)
+                : 0;
         }
     }
 }

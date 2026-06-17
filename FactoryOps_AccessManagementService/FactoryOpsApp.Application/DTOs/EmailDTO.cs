@@ -9,10 +9,11 @@ namespace FactoryOpsApp.Application.DTOs
     
     public class EmailDTO
     {
-        public string From { get; set; }
-        public string To { get; set; }
-        public string Subject { get; set; }
-        public string Body { get; set; }
+        public string From { get; set; } = string.Empty;
+        public string To { get; set; } = string.Empty;
+        //public List<string> To { get; set; } = new();
+        public string Subject { get; set; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
         public List<string> Cc { get; set; } = new();
         public List<string> Bcc { get; set; } = new();
         public List<EmailAttachment> Attachments { get; set; } = new();

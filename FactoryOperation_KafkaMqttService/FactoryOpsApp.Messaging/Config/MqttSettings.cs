@@ -2,15 +2,18 @@
 {
     public class MqttSettings
     {
-        public string BrokerUrl { get; set; } = "test.mosquitto.org";
+        public string TenantId { get; set; } = string.Empty;   
+        //public string BrokerUrl { get; set; } = "localhost";
+        public string BrokerUrl { get; set; } = "44.211.113.36";
         public int BrokerPort { get; set; } = 1883;
-        public string ClientId { get; set; } = "factory-ops-app-test-12348203479237492639-3938er9fdh";
+        public string? ClientId { get; set; }
+        public string? ClientIdTemplate { get; set; }
         public string? Username { get; set; }
         public string? Password { get; set; }
-        public string Topic { get; set; } = "tenant/+/devices/+/telemetry";
+        public string Topic { get; set; } = "tenant/+/devices/+/#";
         public int QoS { get; set; } = 0;
         public bool CleanSession { get; set; } = false;
-        public int KeepAlive { get; set; } = 60;
+        public int KeepAlive { get; set; } = 30;
         public int ReconnectDelaySeconds { get; set; } = 5;
 
         public LwtSettings? Lwt { get; set; }
@@ -41,7 +44,7 @@
 
     public record TlsSettings
     {
-        public bool Enable { get; init; } = true;
+        public bool Enable { get; init; } = false;
         public bool UseMutualTls { get; init; } = false;
         public string? CaCertPath { get; init; }
         public string? ClientCertPath { get; init; }

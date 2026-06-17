@@ -1,166 +1,494 @@
-﻿using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.DBContext;
-using FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Config;
-using FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Interfaces;
+﻿using FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Interfaces;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Models;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Config;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Interfaces;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Models;
-using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
+using FactoryOps.Shared.Observability;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
 
 namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
 {
-
-    public class MqttToKafkaBridgeService : BackgroundService
+    /// <summary>
+    /// Infrastructure-only bridge service.
+    /// Responsible for translating MQTT ↔ Kafka messages.
+    /// Contains NO domain or business logic.
+    /// </summary>
+    public sealed class MqttToKafkaBridgeService : BackgroundService
     {
         private readonly IMqttClientService _mqtt;
         private readonly IKafkaProducerService _kafka;
-        private readonly KafkaSettings _kafkaSettings;
-        private readonly MqttSettings _mqttSettings;
+        private readonly IKafkaConsumerBridgeService _kafkaConsumer;
+        private readonly IMessagingSettingsProvider _settingsProvider;
+        private readonly ITenantResolver _tenantResolver;
         private readonly ILogger<MqttToKafkaBridgeService> _logger;
         private readonly Channel<MqttMessage> _channel;
-        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILastTelemetryStore _lastStore;
+        private string? _currentMqttTopic;
 
-        private int _backlogDepth; // step 4: backlog gauge
+        private int _backlogDepth;
+        private int _kafkaToMqttLoopStarted = 0;
 
         public MqttToKafkaBridgeService(
             IMqttClientService mqtt,
             IKafkaProducerService kafka,
-            IOptions<KafkaSettings> kafkaOpts,
-            IOptions<MqttSettings> mqttOpts,
-            IServiceScopeFactory scopeFactory,
+            IKafkaConsumerBridgeService kafkaConsumer,
+            IMessagingSettingsProvider settingsProvider,
+            ITenantResolver tenantResolver,
             ILastTelemetryStore lastStore,
             ILogger<MqttToKafkaBridgeService> logger)
         {
             _mqtt = mqtt;
             _kafka = kafka;
-            _kafkaSettings = kafkaOpts.Value;
-            _mqttSettings = mqttOpts.Value;
-            _scopeFactory = scopeFactory;
+            _kafkaConsumer = kafkaConsumer;
+            _settingsProvider = settingsProvider;
+            _tenantResolver = tenantResolver;
             _lastStore = lastStore;
             _logger = logger;
+
             _channel = Channel.CreateBounded<MqttMessage>(new BoundedChannelOptions(20_000)
             {
-                SingleReader = true,
+                SingleReader = false,
                 SingleWriter = false,
                 FullMode = BoundedChannelFullMode.Wait
             });
+
+            _settingsProvider.SettingsChanged += OnSettingsChanged;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        // SETTINGS HOT RELOAD (SAFE)
+        private void OnSettingsChanged(object? sender, int? tenantId)
         {
-            // step 4: expose backlog depth to OTel as an observable gauge
-            Observability.Telemetry.RegisterBridgeQueueDepth(() => Volatile.Read(ref _backlogDepth));
-
-            await _mqtt.ConnectAsync(stoppingToken);
-
-            await _mqtt.SubscribeAsync(_mqttSettings.Topic, async (m) =>
-            {
-                // Store latest per-device for UI/APIs
-                _lastStore.Add(m);
-
-                await _channel.Writer.WriteAsync(m, stoppingToken);
-                Interlocked.Increment(ref _backlogDepth); // step 4: increase backlog after enqueued
-            }, stoppingToken);
-
-            _logger.LogInformation("MqttToKafkaBridgeService started (mqttFilter={Filter}, kafkaTopic={Topic})",
-                _mqttSettings.Topic, _kafkaSettings.Topic);
-
-            await foreach (var msg in _channel.Reader.ReadAllAsync(stoppingToken))
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    var tenantId = ExtractTenantIdFromTopic(msg.Topic);
-                    var deviceCode = ExtractDeviceCodeFromTopic(msg.Topic);
+                    var settings = _settingsProvider.GetEffectiveSettings(tenantId);
+                    var newTopic = settings.Mqtt.Topic;
 
-                    // step 2: subscriber-side DLQ if we cannot resolve tenant
-                    if (!tenantId.HasValue)
+                    if (string.Equals(_currentMqttTopic, newTopic, StringComparison.OrdinalIgnoreCase))
+                        return;
+
+                    _logger.LogInformation(
+                        "Bridge MQTT topic changed: {Old} → {New}",
+                        _currentMqttTopic,
+                        newTopic);
+
+                    if (!string.IsNullOrWhiteSpace(_currentMqttTopic))
                     {
-                        await PublishToKafkaDlqAsync("missing-tenant-id", msg, stoppingToken);
-                        continue;
+                        await _mqtt.UnsubscribeAsync(_currentMqttTopic);
                     }
 
-                    if (!string.IsNullOrEmpty(deviceCode))
+                    await _mqtt.SubscribeAsync(newTopic, async msg =>
                     {
-                        await UpdateDeviceHeartbeatAsync(tenantId.Value, deviceCode);
-                    }
+                        _lastStore.Add(msg);
+                        await _channel.Writer.WriteAsync(msg);
+                        Interlocked.Increment(ref _backlogDepth);
+                    });
 
-                    var envelope = new KafkaMessageEnvelope
-                    {
-                        Key = $"{tenantId ?? 0}_{deviceCode ?? "unknown"}_{Guid.NewGuid():N}",
-                        Payload = new
-                        {
-                            tenantId = tenantId,
-                            deviceCode = deviceCode,
-                            topic = msg.Topic,
-                            payloadBase64 = Convert.ToBase64String(msg.Payload),
-                            qos = msg.QoS,
-                            receivedAt = msg.ReceivedAt
-                        },
-                        Source = "MQTT",
-                        Timestamp = DateTime.UtcNow,
-                        Headers = new Dictionary<string, string>
-                        {
-                            ["tenant-id"] = (tenantId?.ToString() ?? "0"),
-                            ["device-code"] = deviceCode ?? "unknown"
-                        }
-                    };
-
-                    var kafkaTopic = ChooseKafkaTopic(tenantId);
-                    await _kafka.ProduceEnvelopeAsync(kafkaTopic, envelope, stoppingToken);
-
-                    // step 4: end-to-end latency metric
-                    try
-                    {
-                        if (msg.ReceivedAt != default)
-                        {
-                            var ms = (DateTimeOffset.UtcNow - msg.ReceivedAt).TotalMilliseconds;
-                            Observability.Telemetry.BridgeLatencyMs.Record(ms,
-                                new KeyValuePair<string, object?>("topic", msg.Topic),
-                                new KeyValuePair<string, object?>("kafka_topic", kafkaTopic));
-                        }
-                    }
-                    catch { }
+                    _currentMqttTopic = newTopic;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to forward MQTT message to Kafka");
-                    // step 2: route to DLQ on processing exception
-                    try { await PublishToKafkaDlqAsync("processing-exception", msg, stoppingToken); } catch { /* best effort */ }
+                    _logger.LogError(ex, "Failed to reload bridge settings");
+                }
+            });
+        }
+
+        // SERVICE LOOP
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            Telemetry.RegisterBridgeQueueDepth(() =>
+                Volatile.Read(ref _backlogDepth));
+
+            await _mqtt.ConnectAsync(stoppingToken);
+
+            var globalSettings = _settingsProvider.GetEffectiveSettings(null);
+            _currentMqttTopic = "tenant/+/devices/#";
+
+            await _mqtt.SubscribeAsync(_currentMqttTopic, async msg =>
+            {
+                _lastStore.Add(msg);
+                await _channel.Writer.WriteAsync(msg, stoppingToken);
+                Interlocked.Increment(ref _backlogDepth);
+            }, stoppingToken);
+
+            _logger.LogInformation(
+                "MQTT→Kafka bridge started (mqttFilter={Filter})",
+                globalSettings.Mqtt.Topic);
+
+            // Start Kafka→MQTT loop ONCE
+            if (globalSettings.Kafka.EnableKafkaToMqtt &&
+                Interlocked.Exchange(ref _kafkaToMqttLoopStarted, 1) == 0)
+            {
+                _ = Task.Run(
+                    () => RunKafkaToMqttLoop(stoppingToken),
+                    stoppingToken);
+
+                _logger.LogInformation(
+                    "Kafka→MQTT bridge enabled (kafkaTopic={KafkaTopic})",
+                    globalSettings.Kafka.KafkaToMqttTopic ?? globalSettings.Kafka.Topic);
+            }
+
+            // WORKER LOOP
+            var workerCount = Environment.ProcessorCount; // auto scale
+
+            _logger.LogInformation("Starting {WorkerCount} bridge workers", workerCount);
+
+            var tasks = new List<Task>();
+
+            for (int i = 0; i < workerCount; i++)
+            {
+                tasks.Add(Task.Run(() => ProcessChannel(stoppingToken), stoppingToken));
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        private async Task ProcessChannel(CancellationToken ct)
+        {
+            await foreach (var msg in _channel.Reader.ReadAllAsync(ct))
+            {
+                try
+                {
+                    await ForwardToKafkaAsync(msg, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Bridge processing failed");
+                    Telemetry.KafkaProduceErrors.Add(1);
+                    try
+                    {
+                        await PublishToKafkaDlqAsync("bridge-processing-error", msg, ct);
+                    }
+                    catch { }
                 }
                 finally
                 {
-                    Interlocked.Decrement(ref _backlogDepth); // step 4: decrease backlog after processed
+                    Interlocked.Decrement(ref _backlogDepth);
                 }
             }
         }
 
-        private async Task PublishToKafkaDlqAsync(string reason, MqttMessage msg, CancellationToken ct)
+        // MQTT → Kafka (DYNAMIC TENANT CONFIG)
+        //private async Task ForwardToKafkaAsync(MqttMessage msg, CancellationToken ct)
+        //{
+        //    var tenantId = _tenantResolver.ResolveFromMqtt(msg.Topic);
+        //    var deviceCode = ExtractDeviceCodeFromTopic(msg.Topic);
+
+        //    var settings = _settingsProvider.GetEffectiveSettings(tenantId);
+
+        //    if (!tenantId.HasValue)
+        //    {
+        //        await PublishToKafkaDlqAsync("missing-tenant-id", msg, ct);
+        //        return;
+        //    }
+        //    var action = DetectActionFromMqttTopic(msg.Topic);
+        //    var kafkaTopic = ChooseKafkaTopic(settings.Kafka, tenantId, deviceCode, action);
+
+        //    var envelope = new KafkaMessageEnvelope
+        //    {
+        //        EventType = "DeviceTelemetryReceived",
+        //        EventVersion = "v1",
+        //        Producer = "FactoryOpsKafkaMqttService",
+        //        Source = "MQTT",
+        //        OccurredAt = msg.ReceivedAt.UtcDateTime,
+        //        Timestamp = DateTime.UtcNow,
+
+        //        TenantId = tenantId,
+        //        CorrelationId = Guid.NewGuid().ToString("N"),
+
+        //        Key = $"{tenantId}_{deviceCode ?? "unknown"}_{Guid.NewGuid():N}",
+
+        //        Payload = new
+        //        {
+        //            tenantId,
+        //            deviceCode,
+        //            mqttTopic = msg.Topic,
+        //            payloadBase64 = Convert.ToBase64String(msg.Payload),
+        //            qos = msg.QoS,
+        //            receivedAt = msg.ReceivedAt
+        //        },
+
+        //        Headers = new Dictionary<string, string>
+        //        {
+        //            ["tenant-id"] = tenantId.Value.ToString(),
+        //            ["device-code"] = deviceCode ?? "unknown",
+        //            ["event-type"] = "DeviceTelemetryReceived"
+        //        }
+        //    };
+
+        //    await _kafka.ProduceEnvelopeAsync(kafkaTopic, envelope, ct);
+
+        //    if (msg.ReceivedAt != default)
+        //    {
+        //        var latencyMs = (DateTimeOffset.UtcNow - msg.ReceivedAt).TotalMilliseconds;
+        //        Telemetry.BridgeLatencyMs.Record(
+        //            latencyMs,
+        //            new KeyValuePair<string, object?>[]
+        //            {
+        //            new("kafka_topic", kafkaTopic)
+        //            });
+        //    }
+        //}
+
+        private async Task ForwardToKafkaAsync(MqttMessage msg, CancellationToken ct)
         {
-            if (!(_kafkaSettings.Dlq?.Enabled ?? true))
+            var tenantId = _tenantResolver.ResolveFromMqtt(msg.Topic);
+
+            Telemetry.MqttMessagesReceived.Add(1);
+            Telemetry.MqttBytesReceived.Add(msg.Payload?.Length ?? 0);
+
+            var deviceCode = ExtractDeviceCodeFromTopic(msg.Topic);
+
+            if (!tenantId.HasValue)
             {
-                _logger.LogWarning("DLQ disabled; dropping message for topic {Topic} reason {Reason}", msg.Topic, reason);
+                await PublishToKafkaDlqAsync("missing-tenant-id", msg, ct);
                 return;
             }
 
-            var dlqTopic = _kafkaSettings.Dlq?.Topic ?? $"{_kafkaSettings.Topic}-dlq";
+            // LOOP PREVENTION + LOG
+            if (IsKafkaOrigin(msg.Payload!))
+            {
+                _logger.LogDebug("Skipping Kafka-origin message (loop prevention)");
+                return;
+            }
+
+            if (!TryValidateJsonPayload(msg.Payload!, out var validationError))
+            {
+                Telemetry.MqttPublishErrors.Add(1);
+                _logger.LogWarning(
+                    "Invalid JSON payload from topic {Topic}: {Error}",
+                    msg.Topic,
+                    validationError);
+
+                await PublishToKafkaDlqAsync("invalid-json-payload", msg, ct);
+                return;
+            }
+
+            var settings = _settingsProvider.GetEffectiveSettings(tenantId);
+            var action = DetectActionFromMqttTopic(msg.Topic);
+
+            var kafkaTopic = ChooseKafkaTopic(
+                settings.Kafka,
+                tenantId,
+                deviceCode,
+                action);
+
+            // CORE FIX: SAME ID FLOW
+            using var doc = JsonDocument.Parse(msg.Payload);
+
+            var root = doc.RootElement;
+
+            var messageId =
+                root.TryGetProperty("messageId", out var mid)
+                    ? mid.GetString()
+                    : Guid.NewGuid().ToString("N");
+
+            var correlationId =
+                root.TryGetProperty("correlationId", out var cid)
+                    ? cid.GetString()
+                    : messageId;
+
             var envelope = new KafkaMessageEnvelope
             {
+                MessageId = messageId!,
+                CorrelationId = correlationId, // SAME FLOW
+
+                EventType = "DeviceTelemetryReceived",
+                EventVersion = "v1",
+                Producer = "FactoryOpsKafkaMqttService",
+                Source = "MQTT",
+
+                OccurredAt = msg.ReceivedAt.UtcDateTime,
+                Timestamp = DateTime.UtcNow,
+
+                TenantId = tenantId,
+                Key = $"{tenantId}_{deviceCode ?? "unknown"}_{messageId}",
+
+                Payload = new
+                {
+                    tenantId,
+                    deviceCode,
+                    mqttTopic = msg.Topic,
+                    payloadBase64 = Convert.ToBase64String(msg.Payload!),
+                    qos = msg.QoS,
+                    receivedAt = msg.ReceivedAt
+                },
+
+                Headers = new Dictionary<string, string>
+                {
+                    ["tenant-id"] = tenantId.Value.ToString(),
+                    ["device-code"] = deviceCode ?? "unknown",
+                    ["event-type"] = "DeviceTelemetryReceived",
+                    [BridgeHeaders.Origin] = BridgeHeaders.Mqtt,
+
+                    // TRACE HEADERS
+                    ["message-id"] = messageId!,
+                    ["correlation-id"] = correlationId!
+                }
+            };
+
+            await _kafka.ProduceEnvelopeAsync(kafkaTopic, envelope, ct);
+            Telemetry.KafkaMessagesProduced.Add(1);
+            // LOGGING (CLIENT PROOF)
+            _logger.LogInformation(
+                "MQTT→Kafka | MessageId={MessageId} Tenant={Tenant} Device={Device}",
+                messageId,
+                tenantId,
+                deviceCode);
+
+            // existing metric preserved
+            if (msg.ReceivedAt != default)
+            {
+                var latencyMs = (DateTimeOffset.UtcNow - msg.ReceivedAt).TotalMilliseconds;
+                Telemetry.BridgeLatencyMs.Record(
+                    latencyMs,
+                    new KeyValuePair<string, object?>[]
+                    {
+                new("kafka_topic", kafkaTopic)
+                    });
+            }
+        }
+        // Kafka → MQTT LOOP (TENANT-AWARE)
+        private async Task RunKafkaToMqttLoop(CancellationToken ct)
+        {
+            await _kafkaConsumer.ConsumeAsync(async envelope =>
+            {
+                if (envelope.Headers != null &&
+                    envelope.Headers.TryGetValue(BridgeHeaders.Origin, out var origin) &&
+                    origin == BridgeHeaders.Mqtt)
+                {
+                    return;
+                }
+
+                try
+                {
+                    var tenantId = _tenantResolver.ResolveFromKafka(envelope);
+
+                    var settings = _settingsProvider.GetEffectiveSettings(tenantId);
+
+                    var mqttTopic = MapKafkaToMqttTopic(
+                        envelope,
+                        settings.Mqtt.Topic);
+
+                    if (string.IsNullOrWhiteSpace(mqttTopic))
+                    {
+                        _logger.LogWarning(
+                            "Kafka→MQTT skipped: no topic mapping for key={Key}",
+                            envelope.Key);
+                        return;
+                    }
+                    string? payloadBase64 = null;
+
+                    if (envelope.Payload is JsonElement json &&
+                        json.TryGetProperty("payloadBase64", out var payloadElement))
+                    {
+                        payloadBase64 = payloadElement.GetString();
+                    }
+
+                    if (string.IsNullOrEmpty(payloadBase64))
+                        throw new InvalidOperationException("Missing payloadBase64 in Kafka message");
+
+                    var payload = Convert.FromBase64String(payloadBase64);
+
+                    // TRACE FIX
+                    var messageId = envelope.MessageId ?? Guid.NewGuid().ToString("N");
+                    var correlationId = envelope.CorrelationId ?? messageId;
+
+                    var wrappedPayload = JsonSerializer.Serialize(new
+                    {
+                        origin = BridgeHeaders.Kafka,
+                        messageId = messageId,
+                        correlationId = correlationId,
+                        tenantId = tenantId,
+                        ts = DateTime.UtcNow,
+                        data = Convert.ToBase64String(payload)
+                    });
+
+                    _logger.LogDebug(
+                        "Publishing Kafka-origin message to MQTT | MessageId={MessageId}",
+                        messageId);
+
+                    _logger.LogWarning(
+                        "Kafka→MQTT PUBLISHING | Topic={Topic} MessageId={MessageId}",
+                        mqttTopic,
+                        messageId);
+
+                    await _mqtt.PublishAsync(
+                        mqttTopic,
+                        Encoding.UTF8.GetBytes(wrappedPayload),
+                        qos: settings.Mqtt.QoS,
+                        retain: false,
+                        ct);
+
+                    Telemetry.BridgeKafkaToMqttCounter.Add(1);
+
+                    // 🔥 LOGGING
+                    _logger.LogInformation(
+                        "Kafka→MQTT | MessageId={MessageId} Tenant={Tenant}",
+                        messageId,
+                        tenantId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Kafka→MQTT bridge failed");
+
+                    try
+                    {
+                        Telemetry.BridgeKafkaToMqttErrors.Add(1);
+                    }
+                    catch { }
+
+                    await PublishKafkaToMqttDlqAsync(
+                        "kafka-to-mqtt-failure",
+                        envelope,
+                        ct);
+                }
+            }, ct);
+        }
+
+        // DLQ: MQTT → Kafka
+        private async Task PublishToKafkaDlqAsync(
+            string reason,
+            MqttMessage msg,
+            CancellationToken ct)
+        {
+            var settings = _settingsProvider.GetEffectiveSettings(null);
+
+            if (!(settings.Kafka.Dlq?.Enabled ?? true))
+            {
+                _logger.LogWarning(
+                    "DLQ disabled. Dropping MQTT message topic={Topic}, reason={Reason}",
+                    msg.Topic,
+                    reason);
+                return;
+            }
+
+            var dlqTopic = settings.Kafka.Dlq?.Topic
+                           ?? $"{settings.Kafka.Topic}-dlq";
+
+            var envelope = new KafkaMessageEnvelope
+            {
+                EventType = "BridgeDlqEvent",
+                EventVersion = "v1",
+                Producer = "FactoryOpsKafkaMqttService",
+                Source = "MQTT-DLQ",
+                Timestamp = DateTime.UtcNow,
+
                 Key = $"dlq_{Guid.NewGuid():N}",
+
                 Payload = new
                 {
                     reason,
-                    topic = msg.Topic,
+                    mqttTopic = msg.Topic,
                     payloadBase64 = Convert.ToBase64String(msg.Payload),
                     qos = msg.QoS,
                     receivedAt = msg.ReceivedAt,
                     routedAt = DateTime.UtcNow
                 },
-                Source = "MQTT-DLQ",
-                Timestamp = DateTime.UtcNow,
+
                 Headers = new Dictionary<string, string>
                 {
                     ["x-error"] = reason,
@@ -169,42 +497,106 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
             };
 
             await _kafka.ProduceEnvelopeAsync(dlqTopic, envelope, ct);
-            _logger.LogWarning("Routed message to Kafka DLQ {DlqTopic} for topic {Topic} reason {Reason}", dlqTopic, msg.Topic, reason);
+            Telemetry.MqttPublishErrors.Add(1);
+            _logger.LogWarning(
+                "Routed MQTT message to Kafka DLQ topic={DlqTopic}, reason={Reason}",
+                dlqTopic,
+                reason);
         }
 
-        private string ChooseKafkaTopic(int? tenantId)
+        // DLQ: Kafka → MQTT
+        private async Task PublishKafkaToMqttDlqAsync(
+            string reason,
+            KafkaMessageEnvelope envelope,
+            CancellationToken ct)
         {
-            if (_kafkaSettings.UsePerTenantTopic && tenantId.HasValue && tenantId.Value > 0)
-            {
-                return $"tenant-{tenantId.Value}-telemetry";
-            }
-            return _kafkaSettings.Topic;
-        }
+            var settings = _settingsProvider.GetEffectiveSettings(
+                _tenantResolver.ResolveFromKafka(envelope));
 
-        private static int? ExtractTenantIdFromTopic(string topic)
-        {
-            if (string.IsNullOrWhiteSpace(topic)) return null;
-            var parts = topic.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < parts.Length - 1; i++)
+            if (!(settings.Kafka.Dlq?.Enabled ?? true))
+                return;
+
+            var dlqTopic = settings.Kafka.Dlq?.Topic
+                           ?? $"{settings.Kafka.Topic}-dlq";
+
+            var dlqEnvelope = new KafkaMessageEnvelope
             {
-                if (parts[i].Equals("tenant", StringComparison.OrdinalIgnoreCase) && i + 1 < parts.Length)
+                EventType = "BridgeDlqEvent",
+                EventVersion = "v1",
+                Producer = "FactoryOpsKafkaMqttService",
+                Source = "KAFKA-DLQ",
+                Timestamp = DateTime.UtcNow,
+
+                Key = $"dlq_{Guid.NewGuid():N}",
+
+                Payload = new
                 {
-                    if (int.TryParse(parts[i + 1], out var id))
-                        return id;
+                    reason,
+                    kafkaKey = envelope.Key,
+                    headers = envelope.Headers,
+                    payload = envelope.Payload,
+                    routedAt = DateTime.UtcNow
+                },
+
+                Headers = new Dictionary<string, string>
+                {
+                    ["x-error"] = reason,
+                    ["x-bridge-direction"] = "kafka-to-mqtt"
                 }
-            }
-            return null;
+            };
+
+            await _kafka.ProduceEnvelopeAsync(dlqTopic, dlqEnvelope, ct);
         }
+
+        // HELPERS
+        private static string MapKafkaToMqttTopic(
+            KafkaMessageEnvelope envelope,
+            string defaultPattern)
+        {
+            if (envelope.Headers == null)
+                return string.Empty;
+
+            if (!envelope.Headers.TryGetValue("tenant-id", out var tenantId))
+                return string.Empty;
+
+            if (!envelope.Headers.TryGetValue("device-code", out var deviceCode))
+                return string.Empty;
+
+            // Use bridge pattern from DB (already applied to mqtt.Topic)
+            return defaultPattern
+                .Replace("{tenantId}", tenantId)
+                .Replace("{deviceCode}", deviceCode);
+        }
+
+        private static string ChooseKafkaTopic(
+            KafkaSettings kafkaSettings,
+            int? tenantId,
+            string? deviceCode,
+            string action)
+        {
+            if (!tenantId.HasValue)
+                throw new InvalidOperationException("TenantId is required to build Kafka topic");
+
+            if (string.IsNullOrWhiteSpace(deviceCode))
+                deviceCode = "unknown";
+
+            if (string.IsNullOrWhiteSpace(action))
+                action = "telemetry"; // safe default
+
+            // Format:
+            // factoryops/{tenantId}/devices/{deviceCode}/{action}
+            return $"factoryops.{tenantId.Value}.devices.{deviceCode}.{action}";
+        }
+
+
 
         private static string? ExtractDeviceCodeFromTopic(string topic)
         {
-            if (string.IsNullOrWhiteSpace(topic)) return null;
             var parts = topic.Split('/', StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < parts.Length - 1; i++)
             {
-                if ((parts[i].Equals("devices", StringComparison.OrdinalIgnoreCase) ||
-                     parts[i].Equals("device", StringComparison.OrdinalIgnoreCase))
-                    && i + 1 < parts.Length)
+                if ((parts[i].Equals("device", StringComparison.OrdinalIgnoreCase)
+                    || parts[i].Equals("devices", StringComparison.OrdinalIgnoreCase)))
                 {
                     return parts[i + 1];
                 }
@@ -212,29 +604,57 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
             return null;
         }
 
-        private async Task UpdateDeviceHeartbeatAsync(int tenantId, string deviceCode)
+        private static string DetectActionFromMqttTopic(string mqttTopic)
+        {
+            mqttTopic = mqttTopic.ToLowerInvariant();
+
+            if (mqttTopic.Contains("/status")) return "status";
+            if (mqttTopic.Contains("/alerts")) return "alerts";
+            if (mqttTopic.Contains("/config")) return "config";
+            if (mqttTopic.Contains("/command")) return "commands";
+
+            return "telemetry"; // default
+        }
+
+        private static bool TryValidateJsonPayload(
+    byte[] payload,
+    out string? error)
         {
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var dbFactory = scope.ServiceProvider.GetRequiredService<TenantDbContextFactory>();
-                await using var db = dbFactory.GetTenantDbContext(tenantId);
+                var json = Encoding.UTF8.GetString(payload);
 
-                var device = await db.FactoryDevices
-                    .FirstOrDefaultAsync(d => d.DeviceCode == deviceCode && d.TenantId == tenantId);
+                using var doc = JsonDocument.Parse(json);
 
-                if (device != null)
-                {
-                    device.LastSeen = DateTime.UtcNow;
-                    device.Status = DeviceStatusEnum.Online;
-                    await db.SaveChangesAsync();
-                    _logger.LogDebug("Updated device {DeviceCode} status for tenant {TenantId}", deviceCode, tenantId);
-                }
+                error = null;
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to update device heartbeat for tenant {TenantId} device {DeviceCode}", tenantId, deviceCode);
+                error = ex.Message;
+                return false;
             }
         }
+
+        private static bool IsKafkaOrigin(byte[] payload)
+        {
+            try
+            {
+                var json = Encoding.UTF8.GetString(payload);
+
+                using var doc = JsonDocument.Parse(json);
+
+                if (doc.RootElement.TryGetProperty("origin", out var origin))
+                {
+                    return origin.GetString() == BridgeHeaders.Kafka;
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
     }
 }

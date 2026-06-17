@@ -1,10 +1,17 @@
-﻿using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.WorkOrderManagement;
+﻿using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.BulkImportFileSample;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.WorkOrderManagement;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.AuditLogs;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.BulkImportFileSample;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Common;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.EventTrace;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Notification;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.WorkOrderServices;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Queue;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Repository.TenantAdmin.BulkImportFileSample;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Repository.TenantAdmin.WorkOrderManagement;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Services.BulkImportFileSample;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Services.Common;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Services.EventTrace;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Services.TenantAdmin.AuditLogs;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Services.TenantAdmin.Notification;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation.Services.TenantAdmin.WorkOrderManagement;
@@ -31,6 +38,8 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.DependencyInje
             services.AddDbContext<MasterFactoryOpsDbContext>(options =>
                 options.UseNpgsql(configuration.GetConnectionString("MasterDbConnection")));
 
+            services.AddScoped<TenantDbContextFactory>();
+
             services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
                 var cfg = ConfigurationOptions.Parse("localhost:6379", true);
@@ -38,7 +47,6 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.DependencyInje
                 return ConnectionMultiplexer.Connect(cfg);
             });
 
-            services.AddScoped<TenantDbContextFactory>();
             services.AddScoped<IWorkOrderRepository, WorkOrderRepository>();
             services.AddScoped<IWorkOrderService, WorkOrderService>();
 
@@ -57,11 +65,19 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.DependencyInje
             services.AddScoped<INotificationQueryService, NotificationQueryService>();
             services.AddScoped<INotificationQueryRepository, NotificationQueryRepository>();
 
+            services.AddScoped<ICalendarRepository, CalendarRepository>();
+            services.AddScoped<ICalendarService, CalendarService>();
+
             // Exception Logger Service
             services.AddScoped<IExceptionLoggerService, ExceptionLoggerService>();
 
             // Audit Log Service
             services.AddScoped<IAuditLogService, AuditLogService>();
+
+            //ImportSampleFile
+
+            services.AddScoped<IBulkImportSampleService, BulkImportSampleService>();
+            services.AddScoped<IBulkImportSampleRepository, BulkImportSampleRepository>();
 
             // SignalR
             services.AddSignalR(options => options.EnableDetailedErrors = true);
@@ -70,6 +86,17 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.DependencyInje
             services.AddSingleton<IUserIdProviders, CustomUserIdProvider>();
             services.AddScoped<INotificationService, NotificationService>();
             services.AddScoped<IFileStorageService, FileStorageService>();
+            services.AddSingleton<EventTraceQueue>();
+
+            //event trace logger    
+            //services.AddSingleton<IEventTraceLogger, FileEventTraceLogger>();
+            services.AddScoped<IEventTraceLogger, DbEventTraceLogger>();
+            services.AddScoped<IWorkOrderSchedulerService, WorkOrderSchedulerService>();
+
+            services.AddHostedService<EventTraceWorker>();
+
+            services.AddScoped<INotificationBuilderService, NotificationBuilderService>();
+
 
             // HttpContext accessor
             services.AddHttpContextAccessor();

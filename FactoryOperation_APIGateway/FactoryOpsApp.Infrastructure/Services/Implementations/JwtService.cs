@@ -12,7 +12,6 @@ namespace FactoryOperation_API_Gateway.FactoryOpsApp.Infrastructure.Services.Imp
     {
         private readonly JwtSettings _jwtSettings;
 
-        // FIXED: Use IOptions<JwtSettings> instead of direct JwtSettings
         public JwtService(IOptions<JwtSettings> jwtSettings)
         {
             _jwtSettings = jwtSettings.Value;

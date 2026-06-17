@@ -14,10 +14,10 @@ namespace FactoryOpsApp.Application.DTOs
         public int TenantId { get; set; }
 
         public int WorkOrderId { get; set; }
-        public string WorkOrderName { get; set; }
+        public string? WorkOrderName { get; set; }
 
         public int InventoryId { get; set; }
-        public string PartName { get; set; }
+        public string? PartName { get; set; }
 
         public int Quantity { get; set; }
         public decimal UnitCost { get; set; }
@@ -34,20 +34,20 @@ namespace FactoryOpsApp.Application.DTOs
     {
         public int TenantId { get; set; }
         public int InventoryId { get; set; }
-        public string Catagory {  get; set; }
+        public string? Catagory {  get; set; }
         public int Stock { get; set; }
-        public string PartName { get; set; }
-        public string PartNumber {  get; set; } 
+        public string? PartName { get; set; }
+        public string? PartNumber {  get; set; } 
         public decimal UnitCost { get; set; }
-        public string Status { get; set; }
+        public string? Status { get; set; }
         public decimal TotalCost {  get; set; }
     }
     public class WorkOrderCostIntegrationDto
     {
         public int TenantId { get; set; }
-        public string WorkOredrNumber { get; set; }
-        public string Title { get; set; }
-        public string Status { get; set; }
+        public string? WorkOredrNumber { get; set; }
+        public string? Title { get; set; }
+        public string? Status { get; set; }
         public int? AssignedToUserId { get; set; }
         public string? AssigedToUserName { get; set; }
         public int? AssignedToTeamId { get; set; }
@@ -62,8 +62,8 @@ namespace FactoryOpsApp.Application.DTOs
         public int WorkOrderPartId { get; set; }
         public int WorkOrderId { get; set; }
         public int InventoryId { get; set; }
-        public string WorkOrderName { get; set; }
-        public string PartName { get; set; }
+        public string? WorkOrderName { get; set; }
+        public string? PartName { get; set; }
         public int Quantity { get; set; }
         public decimal UnitCost { get; set; }
         public bool IsActive { get; set; } = true;
@@ -76,4 +76,67 @@ namespace FactoryOpsApp.Application.DTOs
         public DateTime UpdatedAt { get;set; } = DateTime.UtcNow;
 
     }
+
+    public class CostReportDto
+    {
+        public CostDetailsDto? CostAnalysis { get; set; }
+        public CostPerCategoryDto? CostPerCategory { get; set; }
+    }
+
+    public class CostDetailsDto
+    {
+        public decimal TotalLaborCosts { get; set; }
+        public decimal TotalPartsCosts { get; set; }
+        public decimal TotalCosts { get; set; }
+    }
+
+    public class CostPerCategoryDto
+    {
+        public decimal PreventiveMaintenance { get; set; }
+        public decimal EmergencyRepairs { get; set; }
+        public decimal RoutineMaintenance { get; set; }
+    }
+
+    public class WorkOrderPartUsageDto
+    {
+        public int TenantId { get; set; }
+        public int WorkOrderId { get; set; }
+        public string? WorkOrderNumber { get; set; }
+        public string? WorkOrderTitle { get; set; }
+
+        public int? ToolId { get; set; }
+        public string? PartName { get; set; }
+        public string? PartNumber { get; set; }
+
+        public int QuantityUsed { get; set; }
+        public decimal UnitCost { get; set; }
+        public decimal PartCost { get; set; }
+
+        public decimal LaborCost { get; set; }
+        public decimal TotalCost { get; set; }
+    }
+
+    //
+
+    public class WorkOrderDashboardDto
+    {
+        public List<WorkOrderTypeSummaryDto> WorkOrdersByType { get; set; } = new();
+        public List<WorkOrderPrioritySummaryDto> WorkOrdersByPriority { get; set; } = new();
+    }
+
+    public class WorkOrderTypeSummaryDto
+    {
+        public string? Type { get; set; }
+        public int Count { get; set; }
+        public decimal Percentage { get; set; }
+    }
+
+    public class WorkOrderPrioritySummaryDto
+    {
+        public string? Priority { get; set; }
+        public int Count { get; set; }
+        public decimal Percentage { get; set; }
+    }
 }
+
+

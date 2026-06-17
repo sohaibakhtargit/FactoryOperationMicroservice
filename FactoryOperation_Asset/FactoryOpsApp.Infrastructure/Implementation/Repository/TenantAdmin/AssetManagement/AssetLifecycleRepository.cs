@@ -1,4 +1,5 @@
 ﻿using FactoryOperation_Asset.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.ExceptionLogger;
+using FactoryOperation_Asset.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using FactoryOpsApp.Application.Common;
 using FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.AssetManagement;
@@ -27,10 +28,11 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
 
         public async Task<CommonResponseModel> AddAssetLifecycleAsync(AssetLifecycleDto dto)
         {
+            using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
+            using var transaction = await tenantDb.Database.BeginTransactionAsync();
+
             try
             {
-                using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
-
                 var entity = new AssetLifecycle
                 {
                     AssetId = dto.AssetId,
@@ -57,30 +59,78 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 };
 
                 await tenantDb.AssetLifecycles.AddAsync(entity);
+                await tenantDb.SaveChangesAsync(); 
+
+                var mapping = new AssetLifecycleMappings
+                {
+                    AssetId = dto.AssetId,
+                    LifecycleId = entity.LifecycleId,
+                    AssetStage = dto.Stage,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = dto.CreatedBy,
+                    IsActive = true,
+                    IsDeleted = false
+                };
+
+                await tenantDb.AssetLifecycleMappings.AddAsync(mapping);
                 await tenantDb.SaveChangesAsync();
 
-                await _auditLogger.LogAuditAsync("Create", $"Created Asset Lifecycle for Asset ID {dto.AssetId}", dto.TenantId, "", "AddAssetLifecycleAsync");
+                await _auditLogger.LogAuditAsync(
+                    "Create",
+                    $"Created Asset Lifecycle for Asset ID {dto.AssetId}",
+                    dto.TenantId,
+                    "",
+                    "AddAssetLifecycleAsync"
+                );
 
-                return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = AssetLifecycleStatusMessage.LifecycleCreated };
+                await transaction.CommitAsync();
+
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Success,
+                    StatusMessage = AssetLifecycleStatusMessage.LifecycleCreated
+                };
             }
             catch (Exception ex)
             {
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetLifecycle-Module", "AddAssetLifecycleAsync", dto.TenantId, null);
-                return new CommonResponseModel { StatusCode = StatusCode.Error, StatusMessage = $"{AssetLifecycleStatusMessage.CreateFailed}: {ex.Message}" };
+                await transaction.RollbackAsync();
+
+                await _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "AssetLifecycle-Module",
+                    "AddAssetLifecycleAsync",
+                    dto.TenantId,
+                    null
+                );
+
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Error,
+                    StatusMessage = $"{AssetLifecycleStatusMessage.CreateFailed}: {ex.Message}"
+                };
             }
         }
+
         public async Task<CommonResponseModel> UpdateAssetLifecycleAsync(AssetLifecycleDto dto)
         {
+            using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
+            using var transaction = await tenantDb.Database.BeginTransactionAsync();
+
             try
             {
-                using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
-
                 var entity = await tenantDb.AssetLifecycles
                     .FirstOrDefaultAsync(a => a.LifecycleId == dto.LifecycleId && !a.IsDeleted);
 
                 if (entity == null)
-                    return new CommonResponseModel { StatusCode = StatusCode.NotFound, StatusMessage = AssetLifecycleStatusMessage.LifecycleNotFound };
+                    return new CommonResponseModel
+                    {
+                        StatusCode = StatusCode.NotFound,
+                        StatusMessage = AssetLifecycleStatusMessage.LifecycleNotFound
+                    };
 
+                var previousStage = entity.Stage;
+
+                // ================= UPDATE CURRENT STATE =================
                 entity.Stage = dto.Stage;
                 entity.ExpectedRetirementDate = dto.ExpectedRetirementDate;
                 entity.ActualRetirementDate = dto.ActualRetirementDate;
@@ -99,17 +149,61 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 entity.UpdatedAt = DateTime.UtcNow;
                 entity.UpdatedBy = dto.UpdatedBy;
 
-                await tenantDb.SaveChangesAsync();
-                await _auditLogger.LogAuditAsync("Update", $"Updated Asset Lifecycle {dto.LifecycleId}", dto.TenantId, "", "UpdateAssetLifecycleAsync");
+                // ================= STAGE HISTORY INSERT =================
+                if (previousStage != dto.Stage)
+                {
+                    var stageEntry = new AssetLifecycleMappings
+                    {
+                        LifecycleId = entity.LifecycleId,
+                        AssetId = entity.AssetId,
+                        AssetStage = dto.Stage,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedBy = dto.UpdatedBy,
+                        IsActive = true,
+                        IsDeleted = false
+                    };
 
-                return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = AssetLifecycleStatusMessage.LifecycleUpdated };
+                    await tenantDb.AssetLifecycleMappings.AddAsync(stageEntry);
+                }
+
+                await tenantDb.SaveChangesAsync();
+
+                await _auditLogger.LogAuditAsync(
+                    "Update",
+                    $"Asset lifecycle stage changed from {previousStage} → {dto.Stage}",
+                    dto.TenantId,
+                    "",
+                    "UpdateAssetLifecycleAsync"
+                );
+
+                await transaction.CommitAsync();
+
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Success,
+                    StatusMessage = AssetLifecycleStatusMessage.LifecycleUpdated
+                };
             }
             catch (Exception ex)
             {
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetLifecycle-Module", "UpdateAssetLifecycleAsync", dto.TenantId, null);
-                return new CommonResponseModel { StatusCode = StatusCode.Error, StatusMessage = $"{AssetLifecycleStatusMessage.UpdateFailed}: {ex.Message}" };
+                await transaction.RollbackAsync();
+
+                await _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "AssetLifecycle-Module",
+                    "UpdateAssetLifecycleAsync",
+                    dto.TenantId,
+                    null
+                );
+
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Error,
+                    StatusMessage = $"{AssetLifecycleStatusMessage.UpdateFailed}: {ex.Message}"
+                };
             }
         }
+
         public async Task<CommonResponseModel> DeleteAssetLifecycleAsync(long lifecycleId, int tenantId)
         {
             try
@@ -120,39 +214,143 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     .FirstOrDefaultAsync(a => a.LifecycleId == lifecycleId && !a.IsDeleted);
 
                 if (entity == null)
-                    return new CommonResponseModel { StatusCode = StatusCode.NotFound, StatusMessage = AssetLifecycleStatusMessage.LifecycleNotFound };
+                {
+                    return new CommonResponseModel
+                    {
+                        StatusCode = StatusCode.NotFound,
+                        StatusMessage = AssetLifecycleStatusMessage.LifecycleNotFound
+                    };
+                }
 
                 entity.IsDeleted = true;
                 entity.IsActive = false;
                 entity.DeletedAt = DateTime.UtcNow;
                 entity.DeletedBy = tenantId;
 
+                var mappings = await tenantDb.AssetLifecycleMappings
+                    .Where(m => m.LifecycleId == lifecycleId && !m.IsDeleted)
+                    .ToListAsync();
+
+                foreach (var mapping in mappings)
+                {
+                    mapping.IsDeleted = true;
+                    mapping.IsActive = false;
+                }
+
                 await tenantDb.SaveChangesAsync();
 
-                await _auditLogger.LogAuditAsync("Delete", $"Deleted Asset Lifecycle {lifecycleId}", tenantId, "", "DeleteAssetLifecycleAsync");
+                await _auditLogger.LogAuditAsync(
+                    "Delete",
+                    $"Deleted Asset Lifecycle {lifecycleId} and its mappings",
+                    tenantId,
+                    "",
+                    "DeleteAssetLifecycleAsync");
 
-                return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = AssetLifecycleStatusMessage.LifecycleDeleted};
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Success,
+                    StatusMessage = AssetLifecycleStatusMessage.LifecycleDeleted
+                };
             }
             catch (Exception ex)
             {
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetLifecycle-Module", "DeleteAssetLifecycleAsync", tenantId, null);
-                return new CommonResponseModel { StatusCode = StatusCode.Error, StatusMessage = $"{AssetLifecycleStatusMessage.DeleteFailed}: {ex.Message}" };
+                await _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "AssetLifecycle-Module",
+                    "DeleteAssetLifecycleAsync",
+                    tenantId,
+                    null);
+
+                return new CommonResponseModel
+                {
+                    StatusCode = StatusCode.Error,
+                    StatusMessage = $"{AssetLifecycleStatusMessage.DeleteFailed}: {ex.Message}"
+                };
             }
         }
-        public async Task<GetAllRecord<GetAssetLifecycleDto>> GetAllAssetLifecyclesAsync(int tenantId, string? stageFilter = null)
+
+        /*        public async Task<GetAllRecord<GetAssetLifecycleDto>> GetAllAssetLifecyclesAsync(int tenantId, string? stageFilter = null)
+                {
+                    try
+                    {
+                        using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+
+                        var query = tenantDb.AssetLifecycles
+                            .Where(a => !a.IsDeleted)
+                            .Include(a => a.Asset)
+                            .AsQueryable();
+
+                        if (!string.IsNullOrEmpty(stageFilter))
+                        {
+                            query = query.Where(a => a.Stage == AssetLifecycleStageEnum.Operation);
+                        }
+
+                        var entities = await query.ToListAsync();
+
+                        var dtoList = entities.Select(a => new GetAssetLifecycleDto
+                        {
+                            LifecycleId = a.LifecycleId,
+                            AssetId = a.AssetId,
+                            AssetName = a.Asset?.AssetName ?? "Unknown",
+                            Stage = a.Stage,
+                            AcquisitionDate = a.AcquisitionDate,
+                            ExpectedRetirementDate = a.ExpectedRetirementDate,
+                            ActualRetirementDate = a.ActualRetirementDate,
+                            AcquisitionCost = a.AcquisitionCost,
+                            CurrentValue = a.CurrentValue,
+                            DepreciationValue = a.DepreciationValue,
+                            TCO = a.TCO,
+                            ROI = a.ROI,
+                            EstimatedRepairCost = a.EstimatedRepairCost,
+                            ReplacementCost = a.ReplacementCost,
+                            AnnualMaintenanceCost = a.AnnualMaintenanceCost,
+                            ResidualValue = a.ResidualValue,
+                            AnalysisNotes = a.AnalysisNotes,
+                            AnalysisType = a.AnalysisType,
+                            ReplacementDue = a.ReplacementDue,
+                            UpdatedOn = a.UpdatedOn,
+                            IsActive = a.IsActive,
+                            YearsInService = GetYearsInService(a.AcquisitionDate),
+                            RetirementTimespan = GetRetirementTimespan(a.ExpectedRetirementDate)
+                        }).ToList();
+
+                        return new GetAllRecord<GetAssetLifecycleDto>
+                        {
+                            StatusCode = StatusCode.Success,
+                            StatusMessage = AssetLifecycleStatusMessage.LifecyclesFetched,
+                            GetAllData = dtoList
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        await _exceptionLogger.LogExceptionAsync(ex, "AssetLifecycle-Module", "GetAllAssetLifecyclesAsync", tenantId, null);
+                        return new GetAllRecord<GetAssetLifecycleDto>
+                        {
+                            StatusCode = StatusCode.Error,
+                            StatusMessage = $"{AssetLifecycleStatusMessage.FetchFailed}: {ex.Message}"
+                        };
+                    }
+                }*/
+
+        public async Task<GetAllRecord<GetAssetLifecycleDto>> GetAllAssetLifecyclesAsync(
+     int tenantId,
+     string? stageFilter = null)
         {
             try
             {
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
 
                 var query = tenantDb.AssetLifecycles
-                    .Where(a => !a.IsDeleted)
+                    .Where(a => !a.IsDeleted && a.IsActive)
                     .Include(a => a.Asset)
+                    .Include(a => a.AssetLifecycleMappings)
                     .AsQueryable();
 
-                if (!string.IsNullOrEmpty(stageFilter))
+                // Optional stage filter
+                if (!string.IsNullOrWhiteSpace(stageFilter)
+                    && Enum.TryParse<AssetLifecycleStageEnum>(stageFilter, true, out var stage))
                 {
-                    query = query.Where(a => a.Stage == AssetLifecycleStageEnum.Operation);
+                    query = query.Where(a => a.Stage == stage);
                 }
 
                 var entities = await query.ToListAsync();
@@ -180,8 +378,16 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     ReplacementDue = a.ReplacementDue,
                     UpdatedOn = a.UpdatedOn,
                     IsActive = a.IsActive,
+
                     YearsInService = GetYearsInService(a.AcquisitionDate),
-                    RetirementTimespan = GetRetirementTimespan(a.ExpectedRetirementDate)
+                    RetirementTimespan = GetRetirementTimespan(a.ExpectedRetirementDate),
+
+
+                    LifecycleStages = a.AssetLifecycleMappings
+                    .Where(m => !m.IsDeleted && m.IsActive && m.AssetStage.HasValue)
+                    .Select(m => m.AssetStage!.Value)
+                    .Distinct()
+                    .ToList()
                 }).ToList();
 
                 return new GetAllRecord<GetAssetLifecycleDto>
@@ -193,7 +399,13 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
             }
             catch (Exception ex)
             {
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetLifecycle-Module", "GetAllAssetLifecyclesAsync", tenantId, null);
+                await _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "AssetLifecycle-Module",
+                    "GetAllAssetLifecyclesAsync",
+                    tenantId,
+                    null);
+
                 return new GetAllRecord<GetAssetLifecycleDto>
                 {
                     StatusCode = StatusCode.Error,
@@ -380,190 +592,326 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 };
             }
         }
-    }
 
-    public class AssetFinancialAnalysisRepository : IAssetFinancialAnalysisRepository
-    {
-        private readonly TenantDbContextFactory _tenantDbContext;
-        private readonly IAuditLogService _auditLogger;
-        private readonly IExceptionLoggerService _exceptionLogger;
 
-        public AssetFinancialAnalysisRepository(TenantDbContextFactory tenantDbContext,
-                                              IAuditLogService auditLogger,
-                                              IExceptionLoggerService exceptionLogger)
+
+
+        public async Task<GetAllRecordsCount<AssetLifeHistoryReportDTO>> GetAssetLifeHistoryReport(int tenantId, int assetId)
         {
-            _tenantDbContext = tenantDbContext;
-            _auditLogger = auditLogger;
-            _exceptionLogger = exceptionLogger;
-        }
+            using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+            var response = new GetAllRecordsCount<AssetLifeHistoryReportDTO>();
 
-        public async Task<CommonResponseModel> AddFinancialAnalysisAsync(AssetFinancialAnalysisDto dto)
-        {
-            try
-            {
-                using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
-
-                var entity = new AssetFinancialAnalysis
+            var data = await (
+                from work in tenantDb.WorkOrders
+                join asset in tenantDb.AssetRegistry
+                    on work.AssetId equals asset.AssetId
+                where asset.AssetId == assetId
+                      && work.Status == WorkOrderStatus.Completed
+                      && work.IsDeleted == false
+                      && work.IsActive == true
+                      && asset.IsDeleted == false
+                      && asset.IsActive == true
+                select new AssetLifeHistoryReportDTO
                 {
-                    AssetId = dto.AssetId,
-                    AnalysisType = dto.AnalysisType,
-                    RepairCost = dto.RepairCost,
-                    ReplacementCost = dto.ReplacementCost,
-                    ROI = dto.ROI,
-                    Recommendations = dto.Recommendations,
-                    AnalysisDate = dto.AnalysisDate,
-                    IsActive = true,
-                    IsDeleted = false,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = dto.CreatedBy
-                };
+                    TenantId = tenantId,
 
-                await tenantDb.AssetFinancialAnalysis.AddAsync(entity);
-                await tenantDb.SaveChangesAsync();
+                    AssetId = asset.AssetId,
+                    AssetName = asset.AssetName,
 
-                await _auditLogger.LogAuditAsync("Create", $"Created Financial Analysis for Asset ID {dto.AssetId}", dto.TenantId, "", "AddFinancialAnalysisAsync");
+                    WorkOrderId = work.WorkOrderId,
+                    WorkOrderName = work.WorkOrderNumber,
+                    Status = work.Status,
 
-                return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysisCreated };
-            }
-            catch (Exception ex)
-            {
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetFinancialAnalysis-Module", "AddFinancialAnalysisAsync", dto.TenantId, null);
-                return new CommonResponseModel { StatusCode = StatusCode.Error, StatusMessage = $"{AssetFinancialAnalysisStatusMessage.CreateFailed}: {ex.Message}" };
-            }
-        }
-
-        public async Task<CommonResponseModel> DeleteFinancialAnalysisAsync(long analysisId, int tenantId)
-        {
-            try
-            {
-                using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
-
-                var entity = await tenantDb.AssetFinancialAnalysis
-                    .FirstOrDefaultAsync(a => a.AnalysisId == analysisId && !a.IsDeleted);
-
-                if (entity == null)
-                    return new CommonResponseModel { StatusCode = StatusCode.NotFound, StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysisNotFound };
-
-                entity.IsDeleted = true;
-                entity.IsActive = false;
-
-                await tenantDb.SaveChangesAsync();
-
-                await _auditLogger.LogAuditAsync("Delete", $"Deleted Financial Analysis {analysisId}", tenantId, "", "DeleteFinancialAnalysisAsync");
-
-                return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysisDeleted };
-            }
-            catch (Exception ex)
-            {
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetFinancialAnalysis-Module", "DeleteFinancialAnalysisAsync", tenantId, null);
-                return new CommonResponseModel { StatusCode = StatusCode.Error, StatusMessage = $"{AssetFinancialAnalysisStatusMessage.DeleteFailed}: {ex.Message}" };
-            }
-        }
-
-        public async Task<GetAllRecord<GetAssetFinancialAnalysisDto>> GetFinancialAnalysesByAssetIdAsync(int assetId, int tenantId, string? analysisType = null)
-        {
-            try
-            {
-                using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
-
-                var query = tenantDb.AssetFinancialAnalysis
-                    .Where(a => a.AssetId == assetId && !a.IsDeleted)
-                    .Include(a => a.Asset)
-                    .AsQueryable();
-
-                if (!string.IsNullOrEmpty(analysisType))
-                {
-                    query = query.Where(a => a.AnalysisType == analysisType);
+                    LaborCost = work.LaborCost,
+                    PartCost = work.PartCost,
+                    TotalCost = work.TotalCost
+                                ?? (work.LaborCost + work.PartCost)
                 }
+            ).ToListAsync();
 
-                var entities = await query
-                    .OrderByDescending(a => a.AnalysisDate)
+            response.StatusCode = "200";
+            response.StatusMessage = "Success";
+            response.GetAllData = data;
+            response.Count = data.Count;
+
+            return response;
+        }
+
+        public async Task<GetSpecificRecord<AssetLifecycleFinancialSummaryDTO>>GetAssetLifeCycleSummery(int tenantId)
+        {
+            var response = new GetSpecificRecord<AssetLifecycleFinancialSummaryDTO>();
+
+            try
+            {
+                using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+
+              
+                var assets = await tenantDb.AssetRegistry
+                    .Where(a => a.IsActive && !a.IsDeleted)
+                    .Select(a => new
+                    {
+
+                        AcquisitionCost = a.AcquisitionCost ?? 0m,
+                        PurchaseDate = a.PurchaseDate,
+                        ExpectedLifespan = a.ExpectedLifespan 
+                    })
                     .ToListAsync();
 
-                var dtoList = entities.Select(a => new GetAssetFinancialAnalysisDto
+                decimal totalAssetValue = assets.Sum(a =>
                 {
-                    AnalysisId = a.AnalysisId,
-                    AssetId = a.AssetId,
-                    AssetName = a.Asset?.AssetName ?? "Unknown",
-                    AnalysisType = a.AnalysisType,
-                    RepairCost = a.RepairCost,
-                    ReplacementCost = a.ReplacementCost,
-                    ROI = a.ROI,
-                    Recommendations = a.Recommendations,
-                    AnalysisDate = a.AnalysisDate,
-                    IsActive = a.IsActive,
-                    AnalysisDateFormatted = a.AnalysisDate.ToString("yyyy-MM-dd HH:mm")
-                }).ToList();
+                    decimal cost = a.AcquisitionCost;
 
-                return new GetAllRecord<GetAssetFinancialAnalysisDto>
+                    int lifespanYears =
+                        a.ExpectedLifespan.HasValue && a.ExpectedLifespan.Value > 0
+                            ? Convert.ToInt32(a.ExpectedLifespan.Value)
+                            : 1;
+
+                    int yearsUsed =
+                        a.PurchaseDate.HasValue
+                            ? Math.Max(0, DateTime.UtcNow.Year - a.PurchaseDate.Value.Year)
+                            : 0;
+
+                    decimal depreciationPerYear = cost / lifespanYears;
+                    decimal depreciatedValue = depreciationPerYear * yearsUsed;
+
+                    return Math.Max(0m, cost - depreciatedValue);
+                });
+
+                decimal totalTco = await tenantDb.WorkOrders
+                    .Where(w =>
+                        w.IsActive &&
+                        !w.IsDeleted &&
+                        w.Status == WorkOrderStatus.Completed &&
+                      tenantDb.AssetRegistry
+                     .Any(a => a.AssetId == w.AssetId && a.IsActive && !a.IsDeleted))
+                     .SumAsync(w =>
+                        (w.LaborCost ?? 0m) + (w.PartCost ?? 0m));
+
+
+                decimal averageRoi =
+                    totalTco > 0
+                        ? Math.Round(((totalAssetValue - totalTco) / totalTco) * 100, 2)
+                        : 0m;
+
+
+                int dueForReplacement = assets.Count(a =>
+                    a.ExpectedLifespan.HasValue &&
+                    a.ExpectedLifespan.Value > 0 &&
+                    a.PurchaseDate.HasValue &&
+                    (DateTime.UtcNow.Year - a.PurchaseDate.Value.Year)
+                        >= Convert.ToInt32(a.ExpectedLifespan.Value));
+
+                response.StatusCode = "200";
+                response.StatusMessage = "Success";
+                response.Data = new AssetLifecycleFinancialSummaryDTO
                 {
-                    StatusCode = StatusCode.Success,
-                    StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysesFetched,
-                    GetAllData = dtoList
+                    TotalAssetValue = Math.Round(totalAssetValue, 2),
+
+
+                    TotalTCO = Math.Round(totalTco, 2),
+
+
+                    AverageROI = averageRoi,
+
+
+                    DueForReplacementCount = dueForReplacement
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetFinancialAnalysis-Module", "GetFinancialAnalysesByAssetIdAsync", tenantId, null);
-                return new GetAllRecord<GetAssetFinancialAnalysisDto>
-                {
-                    StatusCode = StatusCode.Error,
-                    StatusMessage = $"{AssetFinancialAnalysisStatusMessage.FetchFailed}: {ex.Message}"
-                };
+                response.StatusCode = "500";
+                response.StatusMessage = "Failed to calculate asset lifecycle financial summary.";
+                response.Data = new AssetLifecycleFinancialSummaryDTO();
             }
-        }
 
-        public async Task<GetAllRecord<GetAssetFinancialAnalysisDto>> GetAllFinancialAnalysesAsync(int tenantId, string? analysisType = null)
-        {
-            try
-            {
-                using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
-
-                var query = tenantDb.AssetFinancialAnalysis
-                    .Where(a => !a.IsDeleted)
-                    .Include(a => a.Asset)
-                    .AsQueryable();
-
-                if (!string.IsNullOrEmpty(analysisType))
-                {
-                    query = query.Where(a => a.AnalysisType == analysisType);
-                }
-
-                var entities = await query
-                    .OrderByDescending(a => a.AnalysisDate)
-                    .ToListAsync();
-
-                var dtoList = entities.Select(a => new GetAssetFinancialAnalysisDto
-                {
-                    AnalysisId = a.AnalysisId,
-                    AssetId = a.AssetId,
-                    AssetName = a.Asset?.AssetName ?? "Unknown",
-                    AnalysisType = a.AnalysisType,
-                    RepairCost = a.RepairCost,
-                    ReplacementCost = a.ReplacementCost,
-                    ROI = a.ROI,
-                    Recommendations = a.Recommendations,
-                    AnalysisDate = a.AnalysisDate,
-                    IsActive = a.IsActive,
-                    AnalysisDateFormatted = a.AnalysisDate.ToString("yyyy-MM-dd HH:mm")
-                }).ToList();
-
-                return new GetAllRecord<GetAssetFinancialAnalysisDto>
-                {
-                    StatusCode = StatusCode.Success,
-                    StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysesFetched,
-                    GetAllData = dtoList
-                };
-            }
-            catch (Exception ex)
-            {
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetFinancialAnalysis-Module", "GetAllFinancialAnalysesAsync", tenantId, null);
-                return new GetAllRecord<GetAssetFinancialAnalysisDto>
-                {
-                    StatusCode = StatusCode.Error,
-                    StatusMessage = $"{AssetFinancialAnalysisStatusMessage.FetchFailed}: {ex.Message}"
-                };
-            }
+            return response;
         }
     }
-}
+
+        public class AssetFinancialAnalysisRepository : IAssetFinancialAnalysisRepository
+        {
+            private readonly TenantDbContextFactory _tenantDbContext;
+            private readonly IAuditLogService _auditLogger;
+            private readonly IExceptionLoggerService _exceptionLogger;
+
+            public AssetFinancialAnalysisRepository(TenantDbContextFactory tenantDbContext,
+                                                  IAuditLogService auditLogger,
+                                                  IExceptionLoggerService exceptionLogger)
+            {
+                _tenantDbContext = tenantDbContext;
+                _auditLogger = auditLogger;
+                _exceptionLogger = exceptionLogger;
+            }
+
+            public async Task<CommonResponseModel> AddFinancialAnalysisAsync(AssetFinancialAnalysisDto dto)
+            {
+                try
+                {
+                    using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
+
+                    var entity = new AssetFinancialAnalysis
+                    {
+                        AssetId = dto.AssetId,
+                        AnalysisType = dto.AnalysisType,
+                        RepairCost = dto.RepairCost,
+                        ReplacementCost = dto.ReplacementCost,
+                        ROI = dto.ROI,
+                        Recommendations = dto.Recommendations,
+                        AnalysisDate = dto.AnalysisDate,
+                        IsActive = true,
+                        IsDeleted = false,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedBy = dto.CreatedBy
+                    };
+
+                    await tenantDb.AssetFinancialAnalysis.AddAsync(entity);
+                    await tenantDb.SaveChangesAsync();
+
+                    await _auditLogger.LogAuditAsync("Create", $"Created Financial Analysis for Asset ID {dto.AssetId}", dto.TenantId, "", "AddFinancialAnalysisAsync");
+
+                    return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysisCreated };
+                }
+                catch (Exception ex)
+                {
+                    await _exceptionLogger.LogExceptionAsync(ex, "AssetFinancialAnalysis-Module", "AddFinancialAnalysisAsync", dto.TenantId, null);
+                    return new CommonResponseModel { StatusCode = StatusCode.Error, StatusMessage = $"{AssetFinancialAnalysisStatusMessage.CreateFailed}: {ex.Message}" };
+                }
+            }
+
+            public async Task<CommonResponseModel> DeleteFinancialAnalysisAsync(long analysisId, int tenantId)
+            {
+                try
+                {
+                    using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+
+                    var entity = await tenantDb.AssetFinancialAnalysis
+                        .FirstOrDefaultAsync(a => a.AnalysisId == analysisId && !a.IsDeleted);
+
+                    if (entity == null)
+                        return new CommonResponseModel { StatusCode = StatusCode.NotFound, StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysisNotFound };
+
+                    entity.IsDeleted = true;
+                    entity.IsActive = false;
+
+                    await tenantDb.SaveChangesAsync();
+
+                    await _auditLogger.LogAuditAsync("Delete", $"Deleted Financial Analysis {analysisId}", tenantId, "", "DeleteFinancialAnalysisAsync");
+
+                    return new CommonResponseModel { StatusCode = StatusCode.Success, StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysisDeleted };
+                }
+                catch (Exception ex)
+                {
+                    await _exceptionLogger.LogExceptionAsync(ex, "AssetFinancialAnalysis-Module", "DeleteFinancialAnalysisAsync", tenantId, null);
+                    return new CommonResponseModel { StatusCode = StatusCode.Error, StatusMessage = $"{AssetFinancialAnalysisStatusMessage.DeleteFailed}: {ex.Message}" };
+                }
+            }
+
+            public async Task<GetAllRecord<GetAssetFinancialAnalysisDto>> GetFinancialAnalysesByAssetIdAsync(int assetId, int tenantId, string? analysisType = null)
+            {
+                try
+                {
+                    using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+
+                    var query = tenantDb.AssetFinancialAnalysis
+                        .Where(a => a.AssetId == assetId && !a.IsDeleted)
+                        .Include(a => a.Asset)
+                        .AsQueryable();
+
+                    if (!string.IsNullOrEmpty(analysisType))
+                    {
+                        query = query.Where(a => a.AnalysisType == analysisType);
+                    }
+
+                    var entities = await query
+                        .OrderByDescending(a => a.AnalysisDate)
+                        .ToListAsync();
+
+                    var dtoList = entities.Select(a => new GetAssetFinancialAnalysisDto
+                    {
+                        AnalysisId = a.AnalysisId,
+                        AssetId = a.AssetId,
+                        AssetName = a.Asset?.AssetName ?? "Unknown",
+                        AnalysisType = a.AnalysisType,
+                        RepairCost = a.RepairCost,
+                        ReplacementCost = a.ReplacementCost,
+                        ROI = a.ROI,
+                        Recommendations = a.Recommendations,
+                        AnalysisDate = a.AnalysisDate,
+                        IsActive = a.IsActive,
+                        AnalysisDateFormatted = a.AnalysisDate.ToString("yyyy-MM-dd HH:mm")
+                    }).ToList();
+
+                    return new GetAllRecord<GetAssetFinancialAnalysisDto>
+                    {
+                        StatusCode = StatusCode.Success,
+                        StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysesFetched,
+                        GetAllData = dtoList
+                    };
+                }
+                catch (Exception ex)
+                {
+                    await _exceptionLogger.LogExceptionAsync(ex, "AssetFinancialAnalysis-Module", "GetFinancialAnalysesByAssetIdAsync", tenantId, null);
+                    return new GetAllRecord<GetAssetFinancialAnalysisDto>
+                    {
+                        StatusCode = StatusCode.Error,
+                        StatusMessage = $"{AssetFinancialAnalysisStatusMessage.FetchFailed}: {ex.Message}"
+                    };
+                }
+            }
+
+            public async Task<GetAllRecord<GetAssetFinancialAnalysisDto>> GetAllFinancialAnalysesAsync(int tenantId, string? analysisType = null)
+            {
+                try
+                {
+                    using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+
+                    var query = tenantDb.AssetFinancialAnalysis
+                        .Where(a => !a.IsDeleted)
+                        .Include(a => a.Asset)
+                        .AsQueryable();
+
+                    if (!string.IsNullOrEmpty(analysisType))
+                    {
+                        query = query.Where(a => a.AnalysisType == analysisType);
+                    }
+
+                    var entities = await query
+                        .OrderByDescending(a => a.AnalysisDate)
+                        .ToListAsync();
+
+                    var dtoList = entities.Select(a => new GetAssetFinancialAnalysisDto
+                    {
+                        AnalysisId = a.AnalysisId,
+                        AssetId = a.AssetId,
+                        AssetName = a.Asset?.AssetName ?? "Unknown",
+                        AnalysisType = a.AnalysisType,
+                        RepairCost = a.RepairCost,
+                        ReplacementCost = a.ReplacementCost,
+                        ROI = a.ROI,
+                        Recommendations = a.Recommendations,
+                        AnalysisDate = a.AnalysisDate,
+                        IsActive = a.IsActive,
+                        AnalysisDateFormatted = a.AnalysisDate.ToString("yyyy-MM-dd HH:mm")
+                    }).ToList();
+
+                    return new GetAllRecord<GetAssetFinancialAnalysisDto>
+                    {
+                        StatusCode = StatusCode.Success,
+                        StatusMessage = AssetFinancialAnalysisStatusMessage.AnalysesFetched,
+                        GetAllData = dtoList
+                    };
+                }
+                catch (Exception ex)
+                {
+                    await _exceptionLogger.LogExceptionAsync(ex, "AssetFinancialAnalysis-Module", "GetAllFinancialAnalysesAsync", tenantId, null);
+                    return new GetAllRecord<GetAssetFinancialAnalysisDto>
+                    {
+                        StatusCode = StatusCode.Error,
+                        StatusMessage = $"{AssetFinancialAnalysisStatusMessage.FetchFailed}: {ex.Message}"
+                    };
+                }
+            }
+        }
+
+
+    }

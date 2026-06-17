@@ -37,30 +37,59 @@ namespace FactoryOperation_AccessManagementService.Controllers.NotificationContr
                 }*/
 
         [HttpGet("getUnread-Notification")]
-        public async Task<IActionResult> GetUnread(int tenantId, int userId)
+        public async Task<IActionResult> GetUnread(int tenantId, int? userId)
         {
             var data = await _notificationService.GetUnreadNotificationsAsync(tenantId, userId);
             return Ok(data);
         }
-
+        [HttpGet("get-user-incomming-notifications")]
+        public async Task<IActionResult> GetUserIncomingNotifications(int tenantId, int? userId)
+        {
+            var data = await _notificationService.GetUserIncomingNotifications(tenantId, userId);
+            {
+                return Ok(data);
+            }
+        }
+        [HttpGet("get-user-outgoing-notifications")]
+        public async Task<IActionResult> GetUserOutgoingNotifications(int tenantId, int? userId)
+        {
+            var data = await _notificationService.GetUserOutgoingNotifications(tenantId, userId);
+            {
+                return Ok(data);
+            }
+        }
         [HttpGet("get-userNotification")]
-        public async Task<IActionResult> GetUserNotifications(int tenantId, int userId)
+        public async Task<IActionResult> GetUserNotifications(int tenantId, int? userId)
         {
             var data = await _notificationService.GetUserNotificationsAsync(tenantId, userId);
             return Ok(data);
         }
 
-        /*  [HttpPost("mark-read")]
-          public async Task<IActionResult> MarkAsRead(int tenantId, int notificationId)
-          {
-              var success = await _notificationService.MarkAsReadAsync(notificationId, tenantId);
-              return success ? Ok("Marked as read") : NotFound("Notification not found");
-          }*/
-        [HttpPost("mark-read")]
-        public async Task<IActionResult> MarkNotificationAsReadAsync(int notificationId, int userId, int tenantId)
+        [HttpPost("mark-read-notification")]
+        public async Task<IActionResult> MarkNotificationAsReadAsync(int tenantId,
+            int? userId,
+            int notificationId,
+            string type)
         {
-            var success = await _notificationService.MarkNotificationAsReadAsync(notificationId, userId, tenantId);
+            var success = await _notificationService.MarkNotificationAsReadAsync(tenantId, userId, notificationId, type);
             return success ? Ok("Marked as read") : NotFound("Notification not found");
+        }
+        [HttpPost("mark-all-read-notification")]
+        public async Task<IActionResult> MarkAllNotificationsAsReadAsync(int? WorkorderId, int? ServiceRequestId, int? userId, int tenantId, int notificationId)
+        {
+            var success = await _notificationService.MarkAllNotificationsAsReadAsync(WorkorderId, ServiceRequestId, userId, tenantId, notificationId);
+            return success ? Ok("Marked notifications as read") : NotFound("Notifications not found");
+        }
+
+        [HttpPost("mark-all-read-notifications")]
+        public async Task<IActionResult> MarkAllNotificationsAsReadAsync(
+            int tenantId,
+            int? userId,
+            string type 
+        )
+        {
+            var success = await _notificationService.MarkAllNotificationsAsReadAsync(tenantId, userId, type);
+            return success ? Ok("All notifications marked as read") : NotFound("No notifications found");
         }
     }
 }

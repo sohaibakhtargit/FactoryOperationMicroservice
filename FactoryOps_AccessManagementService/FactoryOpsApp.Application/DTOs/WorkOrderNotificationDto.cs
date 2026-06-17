@@ -35,7 +35,7 @@ namespace FactoryOpsApp.Application.DTOs
         public string Title { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
         public DateTime EventTime { get; set; } = DateTime.UtcNow;
-        public int? TargetUserId { get; set; } // manager
+        public int? TargetUserId { get; set; } 
         public string EventType { get; set; } = "LowStock";
     }
 

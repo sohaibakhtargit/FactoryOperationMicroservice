@@ -8,6 +8,12 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
     public enum GroupTypeEnum
     {
         Area,
+        Production,
+        QualityControl,
+        Maintenance,
+        Safety,
+        ResearchAndDevelopment,
+        Logistics,
         Department,
         Line,
         Building,

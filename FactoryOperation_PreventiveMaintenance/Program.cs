@@ -23,7 +23,6 @@ var envMode = builder.Configuration.GetValue<string>("EnvironmentMode");
 
 // Add services to the container.
 
-builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -85,7 +84,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
          ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
          ValidAudience = builder.Configuration["JwtSettings:Audience"],
          IssuerSigningKey = new SymmetricSecurityKey(
-             Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]))
+             Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]!))
      };
 
      options.Events = new JwtBearerEvents
@@ -107,7 +106,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
  });
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -133,19 +131,36 @@ builder.Services.AddScoped<IMaintenanceScheduleService, MaintenanceScheduleServi
 builder.Services.AddScoped<IMaintenanceTaskRepository, MaintenanceTaskRepository>();
 builder.Services.AddScoped<IMaintenanceTaskService, MaintenanceTaskService>();
 
+builder.Services.AddScoped<IMaintenanceHistoryRepository, MaintenanceHistoryRepository>();
+builder.Services.AddScoped<IMaintenanceHistoryService, MaintenanceHistoryService>();
+
 
 builder.Services.AddScoped<IExceptionLoggerService, ExceptionLoggerService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("CorsPolicy", builder =>
+//        builder
+//        .SetIsOriginAllowed(_ => true)
+//        .AllowAnyMethod()
+//        .AllowAnyHeader()
+//        .AllowCredentials()
+//        );
+//});
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CorsPolicy", builder =>
-        builder
-        .SetIsOriginAllowed(_ => true)
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials()
-        );
+    options.AddPolicy("CorsPolicy", policy =>
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "https://ms.stagingsdei.com:8108"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials());
 });
 
 

@@ -12,7 +12,6 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 {
     public class RoleRepository : IRoleRepository
     {
-
         private readonly TenantDbContextFactory _tenantDbContext;
         private readonly IExceptionLoggerService _exceptionLogger;
         private readonly IAuditLogService _auditLogger;
@@ -40,7 +39,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     return response;
                 }
 
-                // ================== CREATE ROLE ==================
+              
                 var newRole = new FactoryRoles
                 {
                     RoleName = dto.RoleName,
@@ -52,9 +51,9 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 };
 
                 tenantDb.FactoryRoles.Add(newRole);
-                await tenantDb.SaveChangesAsync();   // To get RoleId
+                await tenantDb.SaveChangesAsync();   
 
-                // ================== ASSIGN PARENT PERMISSIONS ==================
+                
                 foreach (var permissionId in dto.PermissionIds)
                 {
                     tenantDb.FactoryRolePermissions.Add(new FactoryRolePermissions
@@ -69,7 +68,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     });
                 }
 
-                // ================== ASSIGN SUB PERMISSIONS ==================
+           
                 foreach (var subPermissionId in dto.SubPermissionIds)
                 {
                     tenantDb.FactoryRoleSubPermissions.Add(new FactoryRoleSubPermissions
@@ -84,7 +83,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     });
                 }
 
-                // ================== AUDIT ==================
+                
                 await _auditLogger.LogAuditAsync(
                     "Create",
                     $"Role '{dto.RoleName}' added with {dto.PermissionIds.Count} permissions & {dto.SubPermissionIds.Count} sub-permissions",
@@ -117,6 +116,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             return response;
         }
 
+
         public async Task<CommonResponseModel> UpdateRole(AddRoleDto dto)
         {
             CommonResponseModel response = new();
@@ -126,6 +126,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
             try
             {
+
                 var existingRole = await tenantDb.FactoryRoles
                     .FirstOrDefaultAsync(r => r.RoleId == dto.RoleId && !r.IsDeleted);
 
@@ -139,88 +140,91 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 existingRole.RoleName = dto.RoleName;
                 existingRole.UpdatedAt = DateTime.UtcNow;
 
-                // ================================================================
-                // UPDATE PARENT PERMISSIONS
-                // ================================================================
+               
                 var existingParentMappings = await tenantDb.FactoryRolePermissions
                     .Where(rp => rp.RoleId == dto.RoleId)
                     .ToListAsync();
 
                 foreach (var mapping in existingParentMappings)
                 {
-                    if (!dto.PermissionIds.Contains(mapping.PermissionId))
+                    if (dto.PermissionIds.Contains(mapping.PermissionId))
                     {
-                        mapping.IsDeleted = true;
-                        mapping.IsActive = false;
-                        mapping.UpdatedAt = DateTime.UtcNow;
-                    }
-                    else
-                    {
+                        
                         mapping.IsDeleted = false;
                         mapping.IsActive = true;
                         mapping.UpdatedAt = DateTime.UtcNow;
                     }
-                }
-
-                var existingPermissionIds = existingParentMappings
-                    .Select(m => m.PermissionId).ToList();
-
-                foreach (var permissionId in dto.PermissionIds)
-                {
-                    if (!existingPermissionIds.Contains(permissionId))
+                    else
                     {
-                        tenantDb.FactoryRolePermissions.Add(new FactoryRolePermissions
-                        {
-                            RoleId = dto.RoleId,
-                            PermissionId = permissionId,
-                            TenantId = dto.TenantId,
-                            IsActive = true,
-                            IsDeleted = false,
-                            CreatedAt = DateTime.UtcNow
-                        });
+                       
+                        mapping.IsDeleted = true;
+                        mapping.IsActive = false;
+                        mapping.UpdatedAt = DateTime.UtcNow;
                     }
                 }
 
-                // ================================================================
-                // UPDATE SUB PERMISSIONS
-                // ================================================================
+                var existingPermissionIdSet = existingParentMappings
+                    .Select(x => x.PermissionId)
+                    .ToHashSet();
+
+                var newPermissions = dto.PermissionIds
+                    .Where(pid => !existingPermissionIdSet.Contains(pid));
+
+                foreach (var permissionId in newPermissions)
+                {
+                    tenantDb.FactoryRolePermissions.Add(new FactoryRolePermissions
+                    {
+                        RoleId = dto.RoleId,
+                        PermissionId = permissionId,
+                        TenantId = dto.TenantId,
+                        IsActive = true,
+                        IsDeleted = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+              
                 var existingSubMappings = await tenantDb.FactoryRoleSubPermissions
                     .Where(rsp => rsp.RoleId == dto.RoleId)
                     .ToListAsync();
 
                 foreach (var mapping in existingSubMappings)
                 {
-                    if (!dto.SubPermissionIds.Contains(mapping.SubPermissionId))
-                    {
-                        mapping.IsDeleted = true;
-                        mapping.UpdatedAt = DateTime.UtcNow;
-                    }
-                    else
+                    if (dto.SubPermissionIds.Contains(mapping.SubPermissionId))
                     {
                         mapping.IsDeleted = false;
                         mapping.IsActive = true;
                         mapping.UpdatedAt = DateTime.UtcNow;
                     }
-                }
-
-                var existingSubIds = existingSubMappings.Select(m => m.SubPermissionId).ToList();
-
-                foreach (var subPermissionId in dto.SubPermissionIds)
-                {
-                    if (!existingSubIds.Contains(subPermissionId))
+                    else
                     {
-                        tenantDb.FactoryRoleSubPermissions.Add(new FactoryRoleSubPermissions
-                        {
-                            RoleId = dto.RoleId,
-                            SubPermissionId = subPermissionId,
-                            TenantId = dto.TenantId,
-                            IsActive = true,
-                            IsDeleted = false,
-                            CreatedAt = DateTime.UtcNow
-                        });
+                        mapping.IsDeleted = true;
+                        mapping.IsActive = false;
+                        mapping.UpdatedAt = DateTime.UtcNow;
                     }
                 }
 
+                var existingSubPermissionIdSet = existingSubMappings
+                    .Select(x => x.SubPermissionId)
+                    .ToHashSet();
+
+                var newSubPermissions = dto.SubPermissionIds
+                    .Where(spid => !existingSubPermissionIdSet.Contains(spid));
+
+                foreach (var subPermissionId in newSubPermissions)
+                {
+                    tenantDb.FactoryRoleSubPermissions.Add(new FactoryRoleSubPermissions
+                    {
+                        RoleId = dto.RoleId,
+                        SubPermissionId = subPermissionId,
+                        TenantId = dto.TenantId,
+                        IsActive = true,
+                        IsDeleted = false,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+ 
                 await _auditLogger.LogAuditAsync(
                     "Update",
                     $"Updated role '{existingRole.RoleName}' with {dto.PermissionIds.Count} permissions and {dto.SubPermissionIds.Count} sub permissions",
@@ -238,7 +242,14 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                await _exceptionLogger.LogExceptionAsync(ex, "RoleModule", "UpdateRole", dto.TenantId, null);
+
+                await _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "RoleModule",
+                    "UpdateRole",
+                    dto.TenantId,
+                    null
+                );
 
                 response.StatusCode = StatusCode.Error;
                 response.StatusMessage = $"{RoleStatusMessage.RoleUpdateFailed}: {ex.Message}";
@@ -328,7 +339,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         TenantId = r.TenantId,
 
                         Permissions =
-                            // GET MAPPED PARENT PERMISSIONS OF ROLE
+                           
                             tenantDb.FactoryRolePermissions
                             .Where(rp => rp.RoleId == r.RoleId && !rp.IsDeleted && rp.IsActive)
                             .Join(tenantDb.FactoryPermissions,
@@ -339,7 +350,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                                       PermissionId = p.PermissionId,
                                       PermissionName = p.Name,
 
-                                      // GET MAPPED SUB PERMISSIONS OF ROLE
+                                  
                                       SubPermissions =
                                            tenantDb.FactoryRoleSubPermissions
                                            .Where(rsp => rsp.RoleId == r.RoleId

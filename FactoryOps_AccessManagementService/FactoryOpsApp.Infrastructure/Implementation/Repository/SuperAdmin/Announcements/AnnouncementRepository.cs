@@ -41,7 +41,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     ScheduledTime = dto.SendImmediately ? null : dto.ScheduledTime,
                     Status = dto.IsDraft
                      ? "draft"
-        : dto.SendImmediately ? "sent" : "scheduled",
+                     : dto.SendImmediately ? "sent" : "scheduled",
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = 1
                 };
@@ -81,9 +81,13 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         foreach (var tenantId in dto.TenantIds)
                         {
                             var tenant = await _masterDbContext.FactoryTenants
-                                                .FirstOrDefaultAsync(t => t.TenantId == tenantId && t.IsActive && !t.IsDeleted);
+                                .FirstOrDefaultAsync(t =>
+                                    t.TenantId == tenantId &&
+                                    t.IsActive &&
+                                    !t.IsDeleted);
 
-                            if (tenant == null) continue;
+                            if (tenant == null || string.IsNullOrWhiteSpace(tenant.AdminEmail))
+                                continue;
 
                             string processedSubject = emailSubject;
                             string processedBody = emailBodyTemplate;
@@ -101,15 +105,21 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                                 foreach (var placeholder in dto.TemplatePlaceholders)
                                 {
                                     string boldValue = $"<b>{placeholder.Value}</b>";
-                                    processedBody = processedBody.Replace($"{{{{{placeholder.Key}}}}}", boldValue);
-                                    processedSubject = processedSubject.Replace($"{{{{{placeholder.Key}}}}}", placeholder.Value);
+
+                                    processedBody = processedBody.Replace(
+                                        $"{{{{{placeholder.Key}}}}}",
+                                        boldValue);
+
+                                    processedSubject = processedSubject.Replace(
+                                        $"{{{{{placeholder.Key}}}}}",
+                                        placeholder.Value);
                                 }
                             }
 
                             var emailDto = new EmailDTO
                             {
                                 From = "shoaibmaliklenovo@gmail.com",
-                                To = "factory.operation@yopmail.com", // tenant.AdminEmail
+                                To = tenant.AdminEmail,
                                 Subject = processedSubject,
                                 Body = $@"<html><body>{processedBody}</body></html>"
                             };
@@ -353,7 +363,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                             var emailDto = new EmailDTO
                             {
                                 From = "shoaibmaliklenovo@gmail.com",
-                                To = "factory.operation@yopmail.com", // tenant.AdminEmail
+                                To = "factory.operation@yopmail.com", 
                                 Subject = processedSubject,
                                 Body = $@"<html><body>{processedBody}</body></html>"
                             };

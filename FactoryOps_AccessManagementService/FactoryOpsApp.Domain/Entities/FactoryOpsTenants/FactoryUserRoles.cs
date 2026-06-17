@@ -5,6 +5,7 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
     public class FactoryUserRoles
     {
         [Key]
+        public int UserRoleId { get; set; }
         public int UserId { get; set; }
         public int RoleId { get; set; }
         public bool IsActive { get; set; } = true;

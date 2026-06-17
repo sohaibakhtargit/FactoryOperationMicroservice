@@ -45,15 +45,21 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
         public async Task<CommonResponseModel> AddOrUpdateIsolationAsync(AddTenantIsolationDto dto)
         {
-            string? relativePath = null;
-            //byte[]? imageBytes = null;
-            if (dto.Logo == null)
+            var existing = await _repository.GetByTenantIdAsync(dto.TenantId);
+
+            string? logoPath = existing?.LogoUrl;
+            string? logoTextPath = existing?.LogoText;
+
+            if (dto.Logo != null)
             {
-                throw new ArgumentNullException(nameof(dto.Logo), "Branding Logo is required");
+                logoPath = await _fileStorageService.SaveFileAsync(dto.Logo, "Logo");
             }
 
-            relativePath = await _fileStorageService.SaveFileAsync(dto.Logo, "Logo");
-            //imageBytes = await File.ReadAllBytesAsync(Path.Combine("wwwroot", relativePath));
+            if (dto.LogoText != null)
+            {
+                logoTextPath = await _fileStorageService.SaveFileAsync(dto.LogoText, "LogoText");
+            }
+
             var model = new TenantIsolation
             {
                 TenantId = dto.TenantId,
@@ -61,12 +67,16 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 DataEncryption = dto.DataEncryption,
                 EncryptionKeyId = dto.EncryptionKeyId,
                 CustomBranding = dto.CustomBranding,
-                LogoUrl = relativePath,
+
+                // ✅ FIX: preserve existing values
+                LogoUrl = logoPath,
+                LogoText = logoTextPath,
+
                 ColorScheme = dto.ColorScheme,
                 DataPartitionId = dto.DataPartitionId
             };
 
-            var result = await _repository.AddOrUpdateAsync(model);
+            await _repository.AddOrUpdateAsync(model);
 
             return new GetSpecificRecord<object>
             {
@@ -74,8 +84,8 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 StatusMessage = "Success",
                 Data = null
             };
-
         }
+
 
         public Task<CommonResponseModel> DeleteComplianceAuditAsync(int id)
         {
@@ -94,7 +104,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
         public async Task<GetTenantIsolationDto?> GetIsolationByTenantIdAsync(int tenantId)
         {
-            string baseUrl = _configuration["BaseUrl:Staging"] ?? "https://ms.stagingsdei.com:8107";
+            string baseUrl = _configuration["BaseUrl:Staging"] ?? "https://ms.stagingsdei.com:8128";
 
             var entity = await _repository.GetByTenantIdAsync(tenantId);
             if (entity == null) return null;
@@ -106,10 +116,13 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 DataEncryption = entity.DataEncryption,
                 EncryptionKeyId = entity.EncryptionKeyId,
                 CustomBranding = entity.CustomBranding,
-                //LogoUrl = entity.LogoUrl,
                 LogoUrl = entity.LogoUrl != null
                             ? $"{baseUrl}/{entity.LogoUrl.Replace("\\", "/")}"
                             : null,
+                LogoText = entity.LogoText != null
+                ? $"{baseUrl}/{entity.LogoText.Replace("\\", "/")}"
+                : null,
+
                 ColorScheme = entity.ColorScheme,
                 DataPartitionId = entity.DataPartitionId
             };

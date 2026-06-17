@@ -25,7 +25,7 @@ namespace FactoryOpsApp.Infrastructure.Service.TenantAdmin.PreventiveMaintenance
             return _repository.AddMaintenanceHistoryAsync(dto);
         }
 
-        public Task<CommonResponseModel> UpdateMaintenanceHistoryAsync(MaintenanceHistoryDto dto)
+        public Task<CommonResponseModel> UpdateMaintenanceHistoryAsync(UpdateMaintenanceHistoryDto dto)
         {
             return _repository.UpdateMaintenanceHistoryAsync(dto);
         }

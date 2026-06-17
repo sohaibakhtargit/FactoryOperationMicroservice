@@ -8,9 +8,9 @@ namespace FactoryOpsApp.Application.DTOs
 {
     public class TechnicianAnalyticsDto
     {
-        public string TechnicianName { get; set; }
-        public string Skills { get; set; }
-        public string Status { get; set; }
+        public string? TechnicianName { get; set; }
+        public string? Skills { get; set; }
+        public string? Status { get; set; }
         public double Utilization { get; set; }
         public int ActiveWorkOrders { get; set; }
     }
@@ -23,6 +23,6 @@ namespace FactoryOpsApp.Application.DTOs
         public int ActiveWorkOrders { get; set; }
         public double ResourceEfficiency { get; set; }
 
-        public List<TechnicianAnalyticsDto> TechnicianDetails { get; set; }
+        public List<TechnicianAnalyticsDto>? TechnicianDetails { get; set; }
     }
 }

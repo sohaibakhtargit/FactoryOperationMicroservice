@@ -3,16 +3,16 @@ using FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Config;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Interfaces;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Models;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Config;
-using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
-using FactoryOpsApp.Domain.Entities.MasterTenantsAdmin;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using static FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Config.KafkaSettings;
 
 namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
 {
-    public class DbMessagingSettingsProvider : IMessagingSettingsProvider
+    public sealed class DbMessagingSettingsProvider : IMessagingSettingsProvider
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IMemoryCache _cache;
@@ -33,44 +33,102 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
             _fallbackKafka = fallbackKafka;
         }
 
+        // ======================================================
+        // PUBLIC API
+        // ======================================================
         public MessagingEffectiveSettings GetEffectiveSettings(int? tenantId = null)
         {
-            var key = tenantId.HasValue ? $"msg:settings:{tenantId.Value}" : "msg:settings:global";
-            if (_cache.TryGetValue(key, out MessagingEffectiveSettings cached))
-                return cached;
+            var cacheKey = tenantId.HasValue && tenantId > 0
+       ? $"msg:settings:tenant:{tenantId.Value}"
+       : "msg:settings:global";
 
+            // SAFE cache read
+            if (_cache.TryGetValue(cacheKey, out var cachedObj) &&
+                cachedObj is MessagingEffectiveSettings cached)
+            {
+                return cached;
+            }
+
+            // --------------------------------------------------
+            // Start from appsettings fallback (SAFE + NON-NULL)
+            // --------------------------------------------------
+            var fallbackMqtt = _fallbackMqtt.Value
+                ?? throw new InvalidOperationException("Fallback MQTT settings are not configured");
+
+            var fallbackKafka = _fallbackKafka.Value
+                ?? throw new InvalidOperationException("Fallback Kafka settings are not configured");
+
+            // Start from appsettings fallback
             var effMqtt = Clone(_fallbackMqtt.Value);
             var effKafka = Clone(_fallbackKafka.Value);
 
             using var scope = _scopeFactory.CreateScope();
-            var masterDb = scope.ServiceProvider.GetRequiredService<MasterFactoryOpsDbContext>();
             var tenantFactory = scope.ServiceProvider.GetRequiredService<TenantDbContextFactory>();
 
-            // 1) Merge Master DB global Kafka settings (active, not deleted; latest updated)
-            var g = masterDb.MessagingGlobalSettings.AsNoTracking()
-                .Where(x => x.IsActive && !x.IsDeleted)
-                .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
-                .FirstOrDefault();
+            // IMPORTANT:
+            // Even "global" config lives in tenant DB in your model
+            //using var tenantDb = tenantFactory.GetTenantDbContext(tenantId ?? 0);
+            var dbTenantId = tenantId.HasValue && tenantId > 0
+                ? tenantId.Value
+                : 0;
 
-            if (g != null)
-                effKafka = MergeKafka(effKafka, g);
+            using var tenantDb = tenantFactory.GetTenantDbContext(dbTenantId);
+            // ======================================================
+            // 1) KAFKA CONFIG
+            // Priority:
+            //   1) Tenant specific
+            //   2) Global (TenantId = null)
+            // ======================================================
+            var kafkaCfg = tenantDb.Set<KafkaConfigurations>()
+             .AsNoTracking()
+             .Where(x =>
+                 x.IsActive &&
+                 !x.IsDeleted
+             )
+             .OrderByDescending(x => x.UpdatedAt)
+             .FirstOrDefault();
 
-            // 2) Merge per-tenant overrides (by TenantId)
-            if (tenantId.HasValue && tenantId.Value > 0)
-            {
-                using var tenantDb = tenantFactory.GetTenantDbContext(tenantId.Value);
-                var t = tenantDb.MessagingTenantSettings.AsNoTracking()
-                    .Where(x => x.TenantId == tenantId.Value)
-                    .OrderByDescending(x => x.UpdatedAt)
-                    .FirstOrDefault();
+            if (kafkaCfg != null)
+                effKafka = MergeKafka(effKafka, kafkaCfg);
 
-                if (t != null)
-                {
-                    effMqtt = MergeMqtt(effMqtt, t);
-                    effKafka = MergeKafka(effKafka, t);
-                }
-            }
+            // ======================================================
+            // 2) MQTT CONFIG
+            // Priority:
+            //   1) Tenant specific
+            //   2) Global
+            // ======================================================
+            var mqttCfg = tenantDb.Set<MqttConfigurations>()
+                        .AsNoTracking()
+                        .Where(x =>
+                            x.IsActive &&
+                            !x.IsDeleted
+                        )
+                        .OrderByDescending(x => x.UpdatedAt)
+                        .FirstOrDefault();
+            if (mqttCfg != null)
+                effMqtt = MergeMqtt(effMqtt, mqttCfg);
 
+            // ======================================================
+            // 3) BRIDGE CONFIG
+            // Priority:
+            //   1) Tenant specific
+            //   2) Global
+            // Then lowest Priority value wins
+            // ======================================================
+            var bridgeCfg = tenantDb.Set<BridgeConfigurations>()
+                     .AsNoTracking()
+                     .Where(x =>
+                         x.Enabled &&
+                         x.IsActive &&
+                         !x.IsDeleted
+                     )
+                     .OrderBy(x => x.Priority)  
+                     .FirstOrDefault();
+
+            if (bridgeCfg != null)
+                ApplyBridge(effKafka, effMqtt, bridgeCfg);
+
+           
             var eff = new MessagingEffectiveSettings
             {
                 TenantId = tenantId ?? 0,
@@ -80,59 +138,75 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
                 Source = "db-cache"
             };
 
-            _cache.Set(key, eff, TimeSpan.FromMinutes(2));
+            _cache.Set(cacheKey, eff, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+                SlidingExpiration = TimeSpan.FromMinutes(2)
+            });
             return eff;
         }
 
         public Task ReloadAsync(int? tenantId = null, CancellationToken ct = default)
         {
-            var key = tenantId.HasValue ? $"msg:settings:{tenantId.Value}" : "msg:settings:global";
+            var key = tenantId.HasValue && tenantId > 0
+                ? $"msg:settings:tenant:{tenantId.Value}"
+                : "msg:settings:global";
+
             _cache.Remove(key);
             SettingsChanged?.Invoke(this, tenantId);
             return Task.CompletedTask;
         }
 
-        private static MqttSettings MergeMqtt(MqttSettings baseCfg, MessagingTenantSettings t)
+        // ======================================================
+        // MERGE: MQTT
+        // ======================================================
+        private static MqttSettings MergeMqtt(
+            MqttSettings baseCfg,
+            MqttConfigurations db)
         {
             var c = Clone(baseCfg);
-            if (!string.IsNullOrWhiteSpace(t.MqttBrokerUrl)) c.BrokerUrl = t.MqttBrokerUrl;
-            if (t.MqttBrokerPort.HasValue) c.BrokerPort = t.MqttBrokerPort.Value;
-            if (!string.IsNullOrWhiteSpace(t.MqttClientId)) c.ClientId = t.MqttClientId;
-            if (t.CleanSession.HasValue) c.CleanSession = t.CleanSession.Value;
-            if (t.KeepAlive.HasValue) c.KeepAlive = t.KeepAlive.Value;
-            if (!string.IsNullOrEmpty(t.Username)) c.Username = t.Username;
-            if (!string.IsNullOrEmpty(t.Password)) c.Password = t.Password; // consider encryption
-            if (!string.IsNullOrWhiteSpace(t.Topic)) c.Topic = t.Topic;
-            if (t.QoS.HasValue) c.QoS = t.QoS.Value;
 
-            if (t.OfflineBufferEnable.HasValue || t.OfflineMax.HasValue)
+            var template = !string.IsNullOrWhiteSpace(db.ClientIdTemplate)
+                ? db.ClientIdTemplate
+                : c.ClientIdTemplate;
+
+            if (!string.IsNullOrWhiteSpace(template))
             {
-                c.OfflineBuffer ??= new OfflineBufferSettings();
-                c.OfflineBuffer = c.OfflineBuffer with
-                {
-                    Enable = t.OfflineBufferEnable ?? c.OfflineBuffer.Enable,
-                    MaxMessages = t.OfflineMax ?? c.OfflineBuffer.MaxMessages
-                };
+                c.ClientId = template.Replace("{tenantId}", db.TenantId?.ToString() ?? "0");
             }
-            return c;
-        }
 
-        private static KafkaSettings MergeKafka(KafkaSettings baseCfg, MessagingGlobalSettings g)
-        {
-            var c = Clone(baseCfg);
-            if (!string.IsNullOrWhiteSpace(g.BootstrapServers)) c.BootstrapServers = g.BootstrapServers;
-            if (!string.IsNullOrWhiteSpace(g.Topic)) c.Topic = g.Topic;
-            if (g.UsePerTenantTopic.HasValue) c.UsePerTenantTopic = g.UsePerTenantTopic.Value;
-            if (!string.IsNullOrWhiteSpace(g.DlqTopic))
-                c.Dlq = c.Dlq is not null ? c.Dlq with { Topic = g.DlqTopic } : new DlqSettings { Topic = g.DlqTopic };
-            if (g.EnableSSL.HasValue) c.EnableSSL = g.EnableSSL.Value;
+            if (string.IsNullOrWhiteSpace(c.ClientId))
+            {
+                c.ClientId = $"factoryops-{db.TenantId ?? 0}-{Guid.NewGuid():N}";
+            }
 
-            if (!string.IsNullOrWhiteSpace(g.ProducerConfigJson))
+            c.CleanSession = db.CleanSession;
+
+            if (!string.IsNullOrEmpty(db.Username))
+                c.Username = db.Username;
+
+            if (!string.IsNullOrEmpty(db.Password))
+                c.Password = db.Password;
+
+            if (db.KeepAliveSeconds > 0)
+                c.KeepAlive = db.KeepAliveSeconds;
+
+            if (!string.IsNullOrWhiteSpace(db.TopicTemplate) &&
+                db.TopicTemplate.Contains("/"))
+            {
+                c.Topic = db.TopicTemplate;
+            }
+
+            c.QoS = db.SubscriptionQos;
+
+            // Offline buffer
+            if (db.OfflineBuffering.RootElement.ValueKind == JsonValueKind.Object)
             {
                 try
                 {
-                    var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(g.ProducerConfigJson);
-                    if (dict != null) c.ProducerConfig = dict;
+                    c.OfflineBuffer =
+                        JsonSerializer.Deserialize<OfflineBufferSettings>(
+                            db.OfflineBuffering.RootElement.GetRawText());
                 }
                 catch { }
             }
@@ -140,14 +214,160 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
             return c;
         }
 
-        private static KafkaSettings MergeKafka(KafkaSettings baseCfg, MessagingTenantSettings t)
+        // ======================================================
+        // MERGE: KAFKA
+        // ======================================================
+        private static KafkaSettings MergeKafka(
+            KafkaSettings baseCfg,
+            KafkaConfigurations db)
         {
             var c = Clone(baseCfg);
-            if (!string.IsNullOrWhiteSpace(t.KafkaTopicOverride)) c.Topic = t.KafkaTopicOverride;
-            if (t.UsePerTenantTopicOverride.HasValue) c.UsePerTenantTopic = t.UsePerTenantTopicOverride.Value;
+
+            // BootstrapServers intentionally NOT overridden
+            // Reason:
+            //   - Broker infra is platform-owned
+            //   - Prevents tenants from hijacking cluster access
+
+            if (!string.IsNullOrWhiteSpace(db.GroupId))
+                c.GroupId = db.GroupId;
+
+            //if (!string.IsNullOrWhiteSpace(db.TopicPattern))
+            //    c.Topic = db.TopicPattern;
+
+            c.UsePerTenantTopic = db.UsePerTenantTopic;
+
+            // Security
+            c.Security ??= new SecuritySettings();
+
+            if (!string.IsNullOrWhiteSpace(db.SecurityProtocol))
+                c.Security = c.Security with { Protocol = db.SecurityProtocol };
+
+            if (!string.IsNullOrWhiteSpace(db.SaslMechanism))
+                c.Security = c.Security with { SaslMechanism = db.SaslMechanism };
+
+            if (!string.IsNullOrWhiteSpace(db.SaslUsername))
+                c.Security = c.Security with { SaslUsername = db.SaslUsername };
+
+            if (!string.IsNullOrWhiteSpace(db.SaslPassword))
+                c.Security = c.Security with { SaslPassword = db.SaslPassword };
+
+            // Producer config
+            if (db.ProducerConfig.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                try
+                {
+                    c.ProducerConfig =
+                        JsonSerializer.Deserialize<Dictionary<string, object>>(
+                            db.ProducerConfig.RootElement.GetRawText());
+                }
+                catch { }
+            }
+
+            // Consumer config
+            if (db.ConsumerConfig.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                try
+                {
+                    c.ConsumerConfig =
+                        JsonSerializer.Deserialize<Dictionary<string, object>>(
+                            db.ConsumerConfig.RootElement.GetRawText());
+                }
+                catch { }
+            }
+
+            // DLQ
+            if (db.DlqConfig.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                try
+                {
+                    c.Dlq =
+                        JsonSerializer.Deserialize<DlqSettings>(
+                            db.DlqConfig.RootElement.GetRawText());
+                }
+                catch { }
+            }
+
             return c;
         }
 
+        // ======================================================
+        // APPLY BRIDGE RULES
+        // ======================================================
+        //private static void ApplyBridge(
+        //    KafkaSettings kafka,
+        //    MqttSettings mqtt,
+        //    BridgeConfigurations bridge)
+        //{
+        //    if (bridge.Direction.Equals("KafkaToMqtt", StringComparison.OrdinalIgnoreCase))
+        //    {
+        //        kafka.EnableKafkaToMqtt = true;
+        //        kafka.KafkaToMqttTopic = bridge.SourcePattern;
+        //        mqtt.Topic = bridge.TargetPattern;
+        //    }
+        //    else
+        //    {
+        //        kafka.EnableKafkaToMqtt = false;
+        //        mqtt.Topic = bridge.SourcePattern;
+        //    }
+
+        //    if (!string.IsNullOrWhiteSpace(bridge.DlqTopic))
+        //    {
+        //        kafka.Dlq = kafka.Dlq is not null
+        //            ? kafka.Dlq with { Topic = bridge.DlqTopic }
+        //            : new DlqSettings { Topic = bridge.DlqTopic };
+        //    }
+        //}
+
+        private static void ApplyBridge(
+        KafkaSettings kafka,
+        MqttSettings mqtt,
+        BridgeConfigurations bridge)
+        {
+            var direction = bridge.Direction?.ToLowerInvariant();
+
+            switch (direction)
+            {
+                case "mqtttokafka":
+
+                    mqtt.Topic = bridge.SourcePattern;
+                    kafka.EnableKafkaToMqtt = false;
+
+                    break;
+
+                case "kafkatomqtt":
+
+                    kafka.EnableKafkaToMqtt = true;
+                    mqtt.Topic = bridge.TargetPattern;
+                    kafka.KafkaToMqttTopic =
+                     !string.IsNullOrWhiteSpace(kafka.KafkaToMqttTopic)
+                         ? kafka.KafkaToMqttTopic
+                         : @"factoryops\.\d+\.devices\..+\.telemetry";
+
+                    break;
+
+                case "bidirectional":
+
+                    mqtt.Topic = bridge.SourcePattern;
+                    kafka.EnableKafkaToMqtt = true;
+                    kafka.KafkaToMqttTopic =
+                     !string.IsNullOrWhiteSpace(kafka.KafkaToMqttTopic)
+                         ? kafka.KafkaToMqttTopic
+                         : @"factoryops\.\d+\.devices\..+\.telemetry";
+
+                    break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(bridge.DlqTopic))
+            {
+                kafka.Dlq = kafka.Dlq is not null
+                    ? kafka.Dlq with { Topic = bridge.DlqTopic }
+                    : new DlqSettings { Topic = bridge.DlqTopic };
+            }
+        }
+
+        // ======================================================
+        // CLONE HELPERS
+        // ======================================================
         private static MqttSettings Clone(MqttSettings s) => new()
         {
             BrokerUrl = s.BrokerUrl,
@@ -178,12 +398,18 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Messaging.Services
             EnableSSL = s.EnableSSL,
             UsePerTenantTopic = s.UsePerTenantTopic,
             Security = s.Security,
-            ProducerConfig = s.ProducerConfig != null ? new Dictionary<string, object>(s.ProducerConfig) : null,
-            ConsumerConfig = s.ConsumerConfig != null ? new Dictionary<string, object>(s.ConsumerConfig) : null,
+            ProducerConfig = s.ProducerConfig != null
+                ? new Dictionary<string, object>(s.ProducerConfig)
+                : null,
+            ConsumerConfig = s.ConsumerConfig != null
+                ? new Dictionary<string, object>(s.ConsumerConfig)
+                : null,
             SchemaRegistry = s.SchemaRegistry,
             Dlq = s.Dlq,
             Observability = s.Observability,
-            Operational = s.Operational
+            Operational = s.Operational,
+            EnableKafkaToMqtt = s.EnableKafkaToMqtt,
+            KafkaToMqttTopic = s.KafkaToMqttTopic
         };
     }
 }

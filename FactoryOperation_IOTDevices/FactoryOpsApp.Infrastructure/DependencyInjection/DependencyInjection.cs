@@ -4,7 +4,6 @@ using FactoryOperation_IOTDevices.FactoryOpsApp.Application.Interfaces.Services.
 using FactoryOperation_IOTDevices.FactoryOpsApp.Infrastructure.Implementation.Repository.TenantAdmin.IOTDevices;
 using FactoryOperation_IOTDevices.FactoryOpsApp.Infrastructure.Implementation.Services.SuperAdmin.AuditLogs;
 using FactoryOperation_IOTDevices.FactoryOpsApp.Infrastructure.Implementation.Services.TenantAdmin.IOTDevices;
-using FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.IOTDevices;
 using FactoryOpsApp.Infrastructure.DBContext;
 using FactoryOpsApp_IOTDevices.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.IOTDevices;
 using Microsoft.EntityFrameworkCore;
@@ -22,21 +21,7 @@ namespace FactoryOperation_IOTDevices.FactoryOpsApp.Infrastructure.DependencyInj
 
             services.AddDbContext<MasterFactoryOpsDbContext>(options =>
                 options.UseNpgsql(configuration.GetConnectionString("MasterDbConnection")));
-            /*
-                        services.AddSingleton<IConnectionMultiplexer>(sp =>
-                        {
-                            var cfg = ConfigurationOptions.Parse("localhost:6379", true);
-                            cfg.AbortOnConnectFail = false;
-                            return ConnectionMultiplexer.Connect(cfg);
-                        });
-            */
-
-       
-
-            // IOT Device Management
-            /*   services.AddScoped<IFactoryGroupService, FactoryGroupService>();
-               services.AddScoped<IFactoryGroupRepository, FactoryGroupRepository>();*/
-
+      
             services.AddScoped<IFactoryMqttTopicService, FactoryMqttTopicService>();
             services.AddScoped<IFactoryMqttTopicRepository, FactoryMqttTopicRepository>();
 

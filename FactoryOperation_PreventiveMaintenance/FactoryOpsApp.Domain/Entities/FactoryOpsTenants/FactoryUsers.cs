@@ -32,7 +32,8 @@ public class FactoryUsers
     [Column("ProfileLogoUrl")]
     public string? ProfileLogoUrl { get; set; }
     public string? Bio { get; set; }
-
+    public string? OTPCode { get; set; }
+    public DateTime? OTPExpiry { get; set; }
     public DateTime CreatedAt { get; set; }
     public int? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }

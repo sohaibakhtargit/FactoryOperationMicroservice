@@ -34,7 +34,6 @@ namespace FactoryOps_AccessManagementService.Controllers.TenantAdminController.T
             var result = await _roleService.AddRole(dto);
             return Ok(result);
         }
-
         /// <summary>
         /// Update role
         /// Modifies existing role configuration and settings

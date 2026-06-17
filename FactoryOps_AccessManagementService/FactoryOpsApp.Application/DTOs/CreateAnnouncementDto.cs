@@ -9,9 +9,9 @@ namespace FactoryOpsApp.Application.DTOs
     public class CreateAnnouncementDto
     {
         public string Title { get; set; }
-        public string Type { get; set; } // info, warning, critical
+        public string Type { get; set; } 
         public string Message { get; set; }
-        public List<string> Channels { get; set; } // email, in-app, popup
+        public List<string> Channels { get; set; } 
         public List<int> TenantIds { get; set; } 
         public bool SendImmediately { get; set; }
         public DateTime? ScheduledTime { get; set; }

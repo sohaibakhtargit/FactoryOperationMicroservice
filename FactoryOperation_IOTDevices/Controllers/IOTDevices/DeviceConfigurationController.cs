@@ -1,6 +1,4 @@
 ﻿using FactoryOpsApp.Application.DTOs;
-using FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.IOTDevices;
-using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using FactoryOpsApp_IOTDevices.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.IOTDevices;
 using Microsoft.AspNetCore.Mvc;
 

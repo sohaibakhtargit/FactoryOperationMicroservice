@@ -70,7 +70,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 "low" => 50,
                 "medium" => 100,
                 "high" => 200,
-                _ => 50 // Default to low if not specified
+                _ => 50 
             };
         }
 
@@ -88,7 +88,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 if (entity == null)
                     return new CommonResponseModel { StatusCode = StatusCode.NotFound, StatusMessage = PointAssignmentStatusMessage.PointAssignmentNotFound };
 
-                // Recalculate base points if complexity changed
+               
                 int basePoints = CalculateBasePoints(dto.Complexity);
                 int totalPoints = basePoints + dto.BonusPoints;
 
@@ -155,22 +155,21 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 var entities = await tenantDb.PointAssignments
                     .Include(pa => pa.Team)
-                    // Removed Include for AssignedToUser since FK is removed
                     .Where(pa => pa.TenantId == tenantId && pa.IsActive)
                     .OrderByDescending(pa => pa.CreatedAt)
                     .ToListAsync();
 
-                // Get all user IDs from point assignments
+                
                 var userIds = entities.Select(pa => pa.AssignedToUserId).Distinct().ToList();
 
-                // Fetch users separately
+              
                 var users = await tenantDb.FactoryUsers
                     .Where(u => userIds.Contains(u.UserId))
                     .ToDictionaryAsync(u => u.UserId, u => u);
 
                 var dtoList = entities.Select(pa =>
                 {
-                    // Get user from dictionary or null if not found
+                   
                     users.TryGetValue(pa.AssignedToUserId, out var assignedUser);
 
                     return new GetPointAssignmentDto
@@ -189,10 +188,10 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         TenantId = pa.TenantId,
                         IsActive = pa.IsActive,
                         TeamName = pa.Team != null ? pa.Team.Name : "No Team",
-                        // Get user name from separately fetched users
+                        
                         AssignedToUserName = assignedUser != null ?
                             $"{assignedUser.FirstName} {assignedUser.LastName}" : "Unknown User",
-                        StatusName = pa.Status.ToString(), // Use enum name directly
+                        StatusName = pa.Status.ToString(), 
                         CreatedAt = pa.CreatedAt,
                         Description = pa.Description
                     };
@@ -224,7 +223,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 var entity = await tenantDb.PointAssignments
                     .Include(pa => pa.Team)
-                    // Removed Include for AssignedToUser since FK is removed
+                    
                     .FirstOrDefaultAsync(pa => pa.PointAssignmentId == pointAssignmentId &&
                                             pa.TenantId == tenantId &&
                                             pa.IsActive);
@@ -236,7 +235,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         StatusMessage = PointAssignmentStatusMessage.PointAssignmentNotFound,
                     };
 
-                // Fetch the assigned user separately
+               
                 var assignedUser = await tenantDb.FactoryUsers
                     .FirstOrDefaultAsync(u => u.UserId == entity.AssignedToUserId);
 
@@ -256,10 +255,10 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     TenantId = entity.TenantId,
                     IsActive = entity.IsActive,
                     TeamName = entity.Team != null ? entity.Team.Name : "No Team",
-                    // Get user name from separately fetched user
+   
                     AssignedToUserName = assignedUser != null ?
                         $"{assignedUser.FirstName} {assignedUser.LastName}" : "Unknown User",
-                    StatusName = entity.Status.ToString(), // Use enum name directly
+                    StatusName = entity.Status.ToString(), 
                     CreatedAt = entity.CreatedAt,
                     Description = entity.Description
                 };

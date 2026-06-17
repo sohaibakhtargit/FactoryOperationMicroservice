@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using FactoryOperation_Asset.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
@@ -89,7 +90,7 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-      //public virtual ICollection<AssetFinancialAnalysis>? FinancialAnalyses { get; set; }
+      public virtual ICollection<AssetLifecycleMappings>? AssetLifecycleMappings { get; set; }
 
     }
 

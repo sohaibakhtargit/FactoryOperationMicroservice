@@ -78,8 +78,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     fileExtension = Path.GetExtension(dto.DocumentFile.FileName);
                     fileSize = dto.DocumentFile.Length;
 
-
-                // Create AssetDocument entity
                 var assetDoc = new AssetDocuments
                 {
                     TenantId = dto.TenantId,
@@ -108,7 +106,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 await tenantDb.SaveChangesAsync();
                 documentId = (int)assetDoc.DocumentId;
 
-                // Audit log
                 var ctx = _httpContextAccessor.HttpContext;
                 var auditData = new Audit_Log_MasterDb()
                 {
@@ -128,7 +125,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 await _masterDbcontext.Audit_Log_MasterDb.AddAsync(auditData);
                 await _masterDbcontext.SaveChangesAsync();
 
-                // Commit transaction
                 await tran.CommitAsync();
 
                 response.StatusCode = StatusCode.Success;
@@ -157,7 +153,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
             string baseUrl = _configuration["BaseUrl:Staging"] ?? "https://ms.stagingsdei.com:8107";
             try
             {
-                // Check if tenant exists
                 var tenant = _masterDbcontext.FactoryTenants
                     .FirstOrDefault(t => t.TenantId == tenantId && !t.IsDeleted);
 
@@ -455,7 +450,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     return response;
                 }
 
-                // Update document properties
                 document.DocumentTitle = dto.DocumentTitle;
                 document.DocumentType = dto.DocumentType;
                 document.Category = dto.Category;
@@ -479,7 +473,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 document.UpdatedAt = DateTime.UtcNow;
                 document.UpdatedBy = dto.UpdatedBy;
 
-                // Audit log
                 var ctx = _httpContextAccessor.HttpContext;
                 var auditData = new Audit_Log_MasterDb()
                 {
@@ -497,7 +490,7 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
 
                 await _masterDbcontext.Audit_Log_MasterDb.AddAsync(auditData);
 
-                // Save changes
+               
                 await tenantDb.SaveChangesAsync();
                 await _masterDbcontext.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -541,7 +534,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     return response;
                 }
 
-                // Soft delete document
                 document.IsDeleted = true;
                 document.IsActive = false;
                 document.UpdatedAt = DateTime.UtcNow;

@@ -29,7 +29,7 @@ namespace FactoryOps_AccessManagementService.Controllers.TenantAdminController.T
         /// <returns>Rule creation result</returns>
         /// <response code="200">Notification rule successfully added</response>
         /// <response code="500">Internal server error during creation</response>
-        [Authorize(Roles = "TenantAdmin")]
+      //  [Authorize(Roles = "TenantAdmin")]
         [HttpPost]
         [Route("Add-Notification-Rules")]
         public async Task<IActionResult> Create([FromBody] NotificationRuleDto dto)

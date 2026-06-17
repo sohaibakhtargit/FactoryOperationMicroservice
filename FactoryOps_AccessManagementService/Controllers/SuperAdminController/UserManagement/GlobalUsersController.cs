@@ -19,7 +19,6 @@ namespace FactoryOps_AccessManagementService.Controllers.SuperAdminController.Us
         {
             _iglobaluserService = iglobaluserService;
         }
-
         /// <summary>
         /// Get all global users
         /// Retrieves complete list of all users across all tenants

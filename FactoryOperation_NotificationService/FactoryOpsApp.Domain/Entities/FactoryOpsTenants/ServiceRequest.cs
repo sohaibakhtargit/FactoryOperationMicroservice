@@ -90,12 +90,12 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
 
     public enum ServiceRequestType
     {
+        Preventive,
+        Corrective,
         Maintenance,
         Repair,
         Inspection,
         Cleaning,
-        Preventive,
-        Corrective,
         Other
     }
 }

@@ -67,7 +67,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
 
             return response;
         }
-
         public async Task<CommonResponseModel> UpdateAssetTrackingAsync(AssetTrackingUpdateDto dto)
         {
             var response = new CommonResponseModel();
@@ -86,14 +85,14 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     return response;
                 }
 
-                // --- Existing field updates ---
+                var previousStatus = entity.Status;
+
+                // -------- BASIC UPDATES --------
                 if (dto.AssetId.HasValue)
                     entity.AssetId = dto.AssetId.Value;
 
                 if (dto.CurrentLocation.HasValue)
                     entity.CurrentLocation = dto.CurrentLocation.Value;
-
-                entity.Status = dto.Status;
 
                 if (dto.AssignedTo.HasValue)
                     entity.AssignedTo = dto.AssignedTo.Value;
@@ -107,31 +106,41 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 if (!string.IsNullOrEmpty(dto.Remarks))
                     entity.Remarks = dto.Remarks;
 
+                entity.Status = dto.Status;
                 entity.TenantId = dto.TenantId;
                 entity.UpdatedBy = dto.UpdatedBy;
                 entity.UpdatedAt = DateTime.UtcNow;
+                entity.StatusUpdatedOn = DateTime.UtcNow;
 
-                // --- New Downtime Tracking Logic ---
-                if (dto.DownStartTime.HasValue)
-                    entity.DownStartTime = dto.DownStartTime;
-
-                if (dto.DownEndTime.HasValue)
-                    entity.DownEndTime = dto.DownEndTime;
-
-                // Calculate downtime only when both start and end times are available
-                if (entity.DownStartTime.HasValue && entity.DownEndTime.HasValue)
+                // Case 1: Asset just went DOWN
+                if (previousStatus != AssetTrackingStatusEnum.Down &&
+                    dto.Status == AssetTrackingStatusEnum.Down)
                 {
-                    var duration = entity.DownEndTime.Value - entity.DownStartTime.Value;
-                    var totalMinutes = duration.TotalMinutes > 0 ? duration.TotalMinutes : 0;
+                    entity.DownStartTime = DateTime.UtcNow;
+                }
 
-                    entity.TotalDownMinutes = totalMinutes;
-                    entity.TotalDownAccumulatedMinutes = (entity.TotalDownAccumulatedMinutes ?? 0) + totalMinutes;
+                // Case 2: Asset recovered FROM DOWN
+                if (previousStatus == AssetTrackingStatusEnum.Down &&
+                    dto.Status != AssetTrackingStatusEnum.Down &&
+                    entity.DownStartTime.HasValue)
+                {
+                    entity.DownEndTime = DateTime.UtcNow;
 
+                    var downMinutes =
+                        (entity.DownEndTime.Value - entity.DownStartTime.Value).TotalMinutes;
+
+                    downMinutes = downMinutes > 0 ? downMinutes : 0;
+
+                    entity.TotalDownMinutes = downMinutes;
+                    entity.TotalDownAccumulatedMinutes =
+                        (entity.TotalDownAccumulatedMinutes ?? 0) + downMinutes;
+
+                    // Reset markers
                     entity.DownStartTime = null;
                     entity.DownEndTime = null;
                 }
 
-                // --- Sync Asset Location ---
+                // -------- SYNC ASSET LOCATION --------
                 if (dto.CurrentLocation.HasValue)
                 {
                     var asset = await tenantDb.AssetRegistry
@@ -150,10 +159,10 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
 
                 await _auditLogger.LogAuditAsync(
                     "Update",
-                    $"Updated AssetTracking Id: {dto.TrackingId} and recalculated downtime if applicable",
+                    $"Updated AssetTracking Id: {dto.TrackingId}, Status: {previousStatus} → {dto.Status}",
                     dto.TenantId,
                     "",
-                    "UpdateAssetTracking"
+                    "UpdateAssetTrackingAsync"
                 );
 
                 response.StatusCode = StatusCode.Success;
@@ -162,7 +171,14 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                await _exceptionLogger.LogExceptionAsync(ex, "AssetTracking-Module", "Update-AssetTracking", dto.TenantId, null);
+                await _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "AssetTracking-Module",
+                    "UpdateAssetTrackingAsync",
+                    dto.TenantId,
+                    null
+                );
+
                 response.StatusCode = StatusCode.Error;
                 response.StatusMessage = $"{AssetTrackingStatusMessage.UpdateFailed}: {ex.Message}";
             }

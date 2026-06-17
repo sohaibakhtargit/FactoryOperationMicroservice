@@ -27,7 +27,7 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         [ForeignKey("LocationId")]
         public Location? Location { get; set; }
 
-        public WorkOrderStatus? Status { get; set; } = WorkOrderStatus.Started;
+        public WorkOrderStatus? Status { get; set; } = WorkOrderStatus.Open;
 
         public PriorityLevel? Priority { get; set; } = PriorityLevel.Medium;
 
@@ -40,18 +40,13 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public DateTime? DueDate { get; set; }
         public DateTime? ScheduleDate { get; set; }
         public int? EstimatedDurationMinutes { get; set; }
-        //public int? RequiredTools { get; set; }
-        //[ForeignKey("RequiredTools")]
-        //public Inventory? RequiredToolItem { get; set; }
-        //public int? RequiredQuantity { get; set; }
 
         [MaxLength(1000)]
         public string? Instructions { get; set; }
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public WorkOrderTypeEnum? WorkOrderType { get; set; } = WorkOrderTypeEnum.Preventive;
-
-        [MaxLength(1000)]
-        public string? CompletionNotes { get; set; }
+       
+        public string? FileType { get; set; }
 
         public decimal? LaborCost { get; set; } = 0;
         public decimal? PartCost { get; set; } = 0;
@@ -67,7 +62,9 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public int? AssetId { get; set; }
         [ForeignKey("AssetId")]
         public AssetRegistry? Asset { get; set; }
-
+        public int? ServiceRequestId { get; set; }
+        [ForeignKey("ServiceRequestId")]
+        public ServiceRequest? ServiceRequest { get; set; }
         public bool IsActive { get; set; } = true;
         public bool IsDeleted { get; set; } = false;
         public int? CreatedBy { get; set; }
@@ -77,27 +74,30 @@ namespace FactoryOpsApp.Domain.Entities.FactoryOpsTenants
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        public ICollection<MaintenanceTask> Tasks { get; set; }
-        public ICollection<WorkOrderSubTask> WorkOrderSubTasks { get; set; }
+        public ICollection<MaintenanceTask>? Tasks { get; set; }
+        public ICollection<WorkOrderSubTask>? WorkOrderSubTasks { get; set; }
         public ICollection<WorkOrderRequiredTool>? RequiredTools { get; set; }
-
-
+        public ICollection<WorkOrderProgressUpdates>? WorkOrderProgressUpdates { get; set; }
 
         public UpdateTypeEnum? UpdateType { get; set; }
         public Decimal? ProgressPercentage { get; set; }
         public string? LastUpdateMessage { get; set; }
-        public string? WorkOrderPhoto { get; set; }
-        public string? WorkOrderPhotoPath { get; set; }
+        public string? WorkOrderMedia { get; set; }
+        public string? WorkOrderMediaPath { get; set; }
+        public string? WorkOrderProgressMedia { get; set; }
+        public string? WorkOrderProgressMediaPath { get; set; }
+        [MaxLength(1000)]
+        public string? CompletionNotes { get; set; }
         public string? Comments { get; set; }
-
         public DateTime? StartTime { get; set; }
         public DateTime? PauseTime { get; set; }
         public bool IsStarted { get; set; } = false;
         public bool IsPaused { get; set; } = false;
-        //  public Decimal? TotalTime { get; set; }
+        public bool IsReminderSent { get; set; } = false;
         public string? TotalTime { get; set; }
         public Decimal? WorkOrderProgressStatus { get; set; }
-
+        public DateTime? CompletedAt { get; set; }
+        public bool IsApprovalReminderSent { get; set; }
 
     }
 }
@@ -119,13 +119,22 @@ public enum WorkOrderStatus
     Cancelled,
     Overdue,
     Active,
-    Inactive
+    Inactive,
+    Open,
+    OnHold,
+    Closed,
+    ReOpened
 }
 
 public enum WorkOrderTypeEnum
 {
     Preventive,
-    Corrective
+    Corrective,
+    Maintenance,
+    Repair,
+    Inspection,
+    Cleaning,
+    Other
 }
 
 public enum PriorityLevel

@@ -17,7 +17,6 @@ namespace FactoryOps_AccessManagementService.Controllers.SuperAdminController.Te
         {
             _teamService = teamService;
         }
-
         /// <summary>
         /// Get all super admin teams
         /// Retrieves complete list of all super admin teams and their members

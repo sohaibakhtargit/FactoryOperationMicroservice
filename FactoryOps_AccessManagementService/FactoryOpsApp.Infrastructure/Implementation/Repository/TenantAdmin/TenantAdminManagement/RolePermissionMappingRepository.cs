@@ -162,36 +162,54 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
             try
             {
-                var result = tenantDb.FactoryRolePermissions
-                .Where(rp => rp.RoleId == roleId && rp.IsActive && !rp.IsDeleted)
-                .Join(tenantDb.FactoryPermissions,
-                      rp => rp.PermissionId,
-                      p => p.PermissionId,
-                      (rp, p) => new PermissionDto
-                      {
-                          PermissionId = p.PermissionId,
-                          PermissionName = p.Name,
-                          TenantId = p.TenantId,
+                var permissions = tenantDb.FactoryRolePermissions
+                    .Where(rp =>
+                        rp.RoleId == roleId &&
+                        rp.IsActive &&
+                        !rp.IsDeleted)
+                    .Join(
+                        tenantDb.FactoryPermissions.Where(p => p.IsActive && !p.IsDeleted),
+                        rp => rp.PermissionId,
+                        p => p.PermissionId,
+                        (rp, p) => new PermissionDto
+                        {
+                            PermissionId = p.PermissionId,
+                            PermissionName = p.Name,
+                            TenantId = p.TenantId,
 
-                          SubPermissions = tenantDb.FactoryRoleSubPermissions
-                                .Where(rsp => rsp.RoleId == roleId && !rsp.IsDeleted && rsp.IsActive)
-                                .Join(tenantDb.FactorySubPermission,
-                                      rsp => rsp.SubPermissionId,
-                                      sp => sp.SubPermissionId,
-                                      (rsp, sp) => new SubPermissionListResponseDto
-                                      {
-                                          SubPermissionId = sp.SubPermissionId,
-                                          SubPermissionName = sp.Name
-                                      }).ToList()
-                      }).ToList();
+                            SubPermissions = (
+                                from rsp in tenantDb.FactoryRoleSubPermissions
+                                join sp in tenantDb.FactorySubPermission
+                                    on rsp.SubPermissionId equals sp.SubPermissionId
+                                where
+                                    rsp.RoleId == roleId &&
+                                    rsp.IsActive &&
+                                    !rsp.IsDeleted &&
+                                    sp.IsActive &&
+                                    !sp.IsDeleted &&
+                                    sp.ParentPermissionId == p.PermissionId 
+                                select new SubPermissionListResponseDto
+                                {
+                                    SubPermissionId = sp.SubPermissionId,
+                                    SubPermissionName = sp.Name
+                                }
+                            ).ToList()
+                        })
+                    .ToList();
 
                 response.StatusCode = StatusCode.Success;
                 response.StatusMessage = "Fetched Successfully";
-                response.GetAllData = result;
+                response.GetAllData = permissions;
             }
             catch (Exception ex)
             {
-                _exceptionLogger.LogExceptionAsync(ex, "RolePermissionMapping", "GetPermissionsByRoleId", tenantId, null);
+                _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "RolePermissionMapping",
+                    "GetPermissionsByRoleId",
+                    tenantId,
+                    null
+                );
 
                 response.StatusCode = StatusCode.Error;
                 response.StatusMessage = $"Fetch failed: {ex.Message}";

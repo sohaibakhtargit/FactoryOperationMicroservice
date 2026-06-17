@@ -5,21 +5,21 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FactoryOps_APIGatewayService", "FactoryOps_APIGatewayService", "{7466DBCF-4C91-73A9-614F-D5B23EFFFB13}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_API_Gateway", "FactoryOperation_APIGateway\FactoryOperation_API_Gateway.csproj", "{EAF97285-4043-442E-8DB0-E29F4DADFB6C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_API_Gateway", "FactoryOperation_APIGateway\FactoryOperation_API_Gateway.csproj", "{EAF97285-4043-442E-8DB0-E29F4DADFB6C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_Asset", "FactoryOperation_Asset\FactoryOperation_Asset.csproj", "{BB9110E9-FC22-4965-9550-77743FDF0C8F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_Asset", "FactoryOperation_Asset\FactoryOperation_Asset.csproj", "{BB9110E9-FC22-4965-9550-77743FDF0C8F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_Inventory", "FactoryOperation_Inventory\FactoryOperation_Inventory.csproj", "{660680E9-33C6-4594-8EFF-AFA902904117}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_Inventory", "FactoryOperation_Inventory\FactoryOperation_Inventory.csproj", "{660680E9-33C6-4594-8EFF-AFA902904117}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_IOTDevices", "FactoryOperation_IOTDevices\FactoryOperation_IOTDevices.csproj", "{58519E70-3E97-482D-AAC5-2EE9171E8B2A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_IOTDevices", "FactoryOperation_IOTDevices\FactoryOperation_IOTDevices.csproj", "{58519E70-3E97-482D-AAC5-2EE9171E8B2A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_KafkaMqttService", "FactoryOperation_KafkaMqttService\FactoryOperation_KafkaMqttService.csproj", "{BC60DB44-3BAA-4CDC-9843-F98A10018370}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_KafkaMqttService", "FactoryOperation_KafkaMqttService\FactoryOperation_KafkaMqttService.csproj", "{BC60DB44-3BAA-4CDC-9843-F98A10018370}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_NotificationService", "FactoryOperation_NotificationService\FactoryOperation_NotificationService.csproj", "{8C051095-F3D1-4CE7-B988-3920F8FCAD6B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_NotificationService", "FactoryOperation_NotificationService\FactoryOperation_NotificationService.csproj", "{8C051095-F3D1-4CE7-B988-3920F8FCAD6B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_PreventiveMaintenance", "FactoryOperation_PreventiveMaintenance\FactoryOperation_PreventiveMaintenance.csproj", "{90899ED0-8A45-4B66-8CA7-628E76EFC175}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_PreventiveMaintenance", "FactoryOperation_PreventiveMaintenance\FactoryOperation_PreventiveMaintenance.csproj", "{90899ED0-8A45-4B66-8CA7-628E76EFC175}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_WorkOrder", "FactoryOperation_WorkOrder\FactoryOperation_WorkOrder.csproj", "{8ACE71D7-6F5E-4F28-A814-8E0C9416D309}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_WorkOrder", "FactoryOperation_WorkOrder\FactoryOperation_WorkOrder.csproj", "{8ACE71D7-6F5E-4F28-A814-8E0C9416D309}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FactoryOps_AssetService", "FactoryOps_AssetService", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
@@ -37,11 +37,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FactoryOps_WorkOrderService
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FactoryOps_AuditTrailService", "FactoryOps_AuditTrailService", "{FD7BEFB9-E355-45DB-A2C5-5493A1C1FC3B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOperation_AuditTrailService", "FactoryOperation_AuditTrailService\FactoryOperation_AuditTrailService.csproj", "{AFFB6777-D363-4353-BDE4-6AC25891B30F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOperation_AuditTrailService", "FactoryOperation_AuditTrailService\FactoryOperation_AuditTrailService.csproj", "{AFFB6777-D363-4353-BDE4-6AC25891B30F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOps_AccessManagementService", "FactoryOps_AccessManagementService\FactoryOps_AccessManagementService.csproj", "{E21BE4C9-3D41-4260-BAB1-0612EEA68101}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FactoryOps_AccessManagementService", "FactoryOps_AccessManagementService\FactoryOps_AccessManagementService.csproj", "{E21BE4C9-3D41-4260-BAB1-0612EEA68101}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FactoryOps_Access_ManagementService", "FactoryOps_Access_ManagementService", "{EE4BBC62-A717-46E6-B1C0-FAD5F3A287A2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FactoryOps.Shared.Observability", "FactoryOps.Shared.Observability\FactoryOps.Shared.Observability.csproj", "{8542F00F-E375-2958-45CB-CAA93E325CD4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -173,6 +175,18 @@ Global
 		{E21BE4C9-3D41-4260-BAB1-0612EEA68101}.Release|x64.Build.0 = Release|Any CPU
 		{E21BE4C9-3D41-4260-BAB1-0612EEA68101}.Release|x86.ActiveCfg = Release|Any CPU
 		{E21BE4C9-3D41-4260-BAB1-0612EEA68101}.Release|x86.Build.0 = Release|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Debug|x64.Build.0 = Debug|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Debug|x86.Build.0 = Debug|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Release|x64.ActiveCfg = Release|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Release|x64.Build.0 = Release|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Release|x86.ActiveCfg = Release|Any CPU
+		{8542F00F-E375-2958-45CB-CAA93E325CD4}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -24,12 +24,17 @@ namespace FactoryOpsApp.Application.DTOs
         public DateTime? ScheduleDate { get; set; }
         public int? EstimatedDurationMinutes { get; set; }
         public int? RequiredToolId { get; set; }
+        public string? RequiredToolName { get; set; }
         public string? Instructions { get; set; }
         public string? CompletionNotes { get; set; }
         public decimal? LaborCost { get; set; }
         public decimal? PartCost { get; set; }
         public decimal? TotalCost { get; set; }
-        public List<WorkOrderToolDto>? RequiredTools
+        public string? WorkOrderMediaPath { get; set; }
+        public string? FileType { get; set; }
+        public int? CreatedBy { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow; 
+        public List<WorkOrderToolDto>? SparePart
         {
             get; set;
 
@@ -40,7 +45,7 @@ namespace FactoryOpsApp.Application.DTOs
     {
         public int TenantId { get; set; }
         public int CreatedBy { get; set; }
-        public IFormFile File { get; set; }
+        public IFormFile? File { get; set; }
     }
 
     public class BulkWorkOrderImportResult
@@ -54,12 +59,12 @@ namespace FactoryOpsApp.Application.DTOs
     public class BulkWorkOrderError
     {
         public int RowNumber { get; set; }
-        public string ErrorMessage { get; set; }
+        public string? ErrorMessage { get; set; }
     }
 
     public class WorkOrderImportCsvDto
     {
-        public string Title { get; set; }
+        public string? Title { get; set; }
         public string? Description { get; set; }
         public int? LocationId { get; set; }
         public string? Priority { get; set; }
@@ -79,17 +84,24 @@ namespace FactoryOpsApp.Application.DTOs
         public int? QuantityRequired { get; set; }
     }
 
+    public class WorkOrderProgressMediaDto
+    {
+        public int WorkOrderId { get; set; }
+        public int TenantId { get; set; }
+        public IFormFile? WorkOrderProgressMedia { get; set; }
+        public int? UpdatedBy { get; set; }
+    } 
 
     public class WorkOrderCreateDto
     {
         public int WorkOrderId { get; set; }
         public int TenantId { get; set; }
+        //public IFormFile? WorkOrderProgressPhoto { get; set; }
+        //public string? WorkOrderProgressPhotoPath { get; set; }
         public int? AssetId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
         public int? LocationId { get; set; }
-        //public IFormFile? WorkOrderPhoto { get; set; }
-        //public string? WorkOrderPhotoPath { get; set; }
         public WorkOrderStatus? Status { get; set; } = WorkOrderStatus.Started;
         public PriorityLevel? Priority { get; set; } = PriorityLevel.Medium;
         public WorkOrderTypeEnum? WorkOrderType { get; set; } = WorkOrderTypeEnum.Corrective;
@@ -106,32 +118,53 @@ namespace FactoryOpsApp.Application.DTOs
         public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;
         public int? UpdatedBy { get; set; }
         public int? BulkImportId { get; set; }
+        public List<WorkOrderToolDto>? RequiredTools { get; set; }
 
-        public List<WorkOrderToolDto>? RequiredTools
-        {
-            get; set;
 
-        }
         public class WorkOrderToolDto
         {
             public int? ToolId { get; set; }
-            public string? ToolName { get; set; }  
-
+            public string? ToolName { get; set; }
             public int? QuantityRequired { get; set; }
         }
+
+       
+       
         public class WorkOrderUpdateDto : WorkOrderCreateDto
         {
-            public int WorkOrderId { get; set; }
             public string? CompletionNotes { get; set; }
+        }
+
+        public class WorkOrderDeleteDto
+        {
+            public int TenantId { get; set; }
+            public int WorkOrderId { get; set; }
+            public int? DeletedBy { get; set; } 
+        }
+
+        public class WorkOrderBulkDeleteDto
+        {
+            public int TenantId { get; set; }
+            public List<int> WorkOrderIds { get; set; } = new();
+            public int? DeletedBy { get; set; }
+        }
+
+        public class WorkOrderApprovalDto
+        {
+            public int TenantId { get; set; }
+            public int WorkOrderId { get; set; }
+            public string? Action { get; set; } // "Approve" or "Reject"
+            public string? Remarks { get; set; }
+            public int? UpdatedBy { get; set; }
         }
         public class WorkOrderProgresssUpdateDto
         {
             public UpdateTypeEnum? UpdateType { get; set; }
-            public WorkOrderStatus? Status { get; set; } = WorkOrderStatus.InProgress;
+            public WorkOrderStatus? Status { get; set; }
             public Decimal? ProgressPercentage { get; set; }
             public string? LastUpdateMessage { get; set; }
-            public IFormFile? WorkOrderPhoto { get; set; }
-            public string? WorkOrderPhotoPath { get; set; }
+            public IFormFile? WorkOrderProgressMedia { get; set; }
+            public string? WorkOrderProgressMediaPath { get; set; }
             public string? Comments { get; set; }
             public DateTime? StartTime { get; set; }
             public DateTime? PauseTime { get; set; }
@@ -147,7 +180,8 @@ namespace FactoryOpsApp.Application.DTOs
             public WorkOrderStatus? Status { get; set; }
             public Decimal? ProgressPercentage { get; set; }
 
-            public string? WorkOrderPhotoPath { get; set; }
+            public string? WorkOrderProgressMediaPath { get; set; }
+            public string? WorkOrderProgressMedia { get; set; }
             public DateTime? StartTime { get; set; }
             public DateTime? PauseTime { get; set; }
             public bool IsStarted { get; set; } = false;
@@ -156,8 +190,8 @@ namespace FactoryOpsApp.Application.DTOs
             public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;
             public int? UpdatedBy { get; set; }
             public int WorkOrderId { get; set; }
-            public string WorkOrderNumber { get; set; }
-            public string AssignedToUser { get; set; }
+            public string? WorkOrderNumber { get; set; }
+            public string? AssignedToUser { get; set; }
             public int? LocationId { get; set; }
             public string? LocationName { get; set; }
             public string? Comments { get; set; }
@@ -171,6 +205,9 @@ namespace FactoryOpsApp.Application.DTOs
         {
             public int WorkOrderId { get; set; }
             public int TenantId { get; set; }
+            public string? TenantEmail { get; set; }
+            public WorkOrderTypeEnum? WorkOrderType { get; set; }
+            public string? WorkOrderTypeName { get; set; }
             public string WorkOrderNumber { get; set; } = string.Empty;
             public string Title { get; set; } = string.Empty;
             public string EventType { get; set; } = string.Empty;
@@ -178,11 +215,18 @@ namespace FactoryOpsApp.Application.DTOs
             public string? Priority { get; set; }
             public string? Status { get; set; }
             public int? AssignedToUserId { get; set; }
+            public int? outgoingNotifications { get; set; }
+            public List<int?>? incomingNotifications { get; set; }
             public int? AssignedToTeamId { get; set; }
-
+            public int? DeletedBy { get; set; }
+            //  public string? WorkOrderType { get; set; }
             // ⭐ NEW: Send these to Notification MS
-            public List<int?> SupervisorUserIds { get; set; } = new();
+            public List<int?> TargetUsersIds { get; set; } = new();
+            public List<string> TargetEmailAddresses { get; set; } = new();
             public int? TargetUserId { get; set; }
+            public string? TechnicianName { get; set; }
+            public int? CreatedBy { get; set; }
+            public int? UpdatedBy { get; set; }
         }
 
 

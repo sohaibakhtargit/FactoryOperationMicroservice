@@ -11,7 +11,7 @@
             public const string Error = "500";
             public const string MultiStatus = "207";
         }
-        //SuperAdmin.....
+
         public static class AnnouncementStatusMessage
         {
             public const string AnnouncementAdded = "Announcement created successfully and emails sent (if applicable)";
@@ -152,11 +152,10 @@
             public const string AuditUserProfileUpdated = "Profile for user '{0}' updated with {1}.";
             public const string AuditSuperAdminProfileUpdated = "Profile for super admin '{0}' updated with {1}.";
             public const string AuditTenantProfileUpdated = "Profile for tenant '{0}' updated with {1}.";
-            public const string AuditUserSuspension = "User {0}ed: {1}"; // Suspend/Unsuspend dynamically
+            public const string AuditUserSuspension = "User {0}ed: {1}"; 
             public const string UnknownError = "An unexpected error occurred.";
         }
 
-        //Tenant Admin Repository Status Messages
 
         public static class ChallengeStatusMessage
         {
@@ -270,7 +269,10 @@
         {
             public const string UserCreated = "User created successfully.";
             public const string UserCreateFailed = "Failed to create user.";
-            public const string UserAlreadyExists = "User with the same email or username already exists.";
+            public const string UserAlreadyExists = "User with the same Email or Phone Number already exists.";
+            public const string EmailAlreadyExists = "A user with this email already exists.";
+            public const string UsernameAlreadyExists = "A user with this username already exists.";
+            public const string PhoneAlreadyExists = "A user with this phone number already exists.";
             public const string UserUpdated = "User updated successfully.";
             public const string UserUpdateFailed = "Failed to update user.";
             public const string UserNotFound = "User not found.";

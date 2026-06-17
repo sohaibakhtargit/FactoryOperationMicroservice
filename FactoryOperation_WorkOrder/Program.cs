@@ -1,8 +1,10 @@
-using FactoryOperation_NotificationService.Middleware;
+﻿using FactoryOperation_NotificationService.Middleware;
 using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.DependencyInjection;
+using FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Jobs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Quartz;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -14,7 +16,6 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     WebRootPath = "wwwroot"
 });
 var envMode = builder.Configuration.GetValue<string>("EnvironmentMode");
-//builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -75,7 +76,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
          ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
          ValidAudience = builder.Configuration["JwtSettings:Audience"],
          IssuerSigningKey = new SymmetricSecurityKey(
-             Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]))
+             Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]!))
      };
 
      options.Events = new JwtBearerEvents
@@ -96,8 +97,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
      };
  });
 
+builder.Services.AddQuartz(q =>
+{
+    var jobKey = new JobKey("WorkOrderScheduler");
+
+    q.AddJob<WorkOrderSchedulerJob>(opts => opts.WithIdentity(jobKey));
+
+    q.AddTrigger(opts => opts
+        .ForJob(jobKey)
+        .WithIdentity("WorkOrderScheduler-trigger")
+
+        // Every 2 minutes
+        .WithCronSchedule("0 */2 * * * ?"));
+});
+
+builder.Services.AddQuartzHostedService(opt =>
+{
+    opt.WaitForJobsToComplete = true;
+});
+
 builder.Services.AddAuthorization();
-//builder.Services.AddControllers();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -107,15 +126,30 @@ builder.Services.AddControllers()
 
 
 builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddHttpClient();
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("CorsPolicy", builder =>
+//        builder
+//        .SetIsOriginAllowed(_ => true)
+//        .AllowAnyMethod()
+//        .AllowAnyHeader()
+//        .AllowCredentials()
+//        );
+//});
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CorsPolicy", builder =>
-        builder
-        .SetIsOriginAllowed(_ => true)
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials()
-        );
+    options.AddPolicy("CorsPolicy", policy =>
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "https://ms.stagingsdei.com:8108"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials());
 });
 
 var app = builder.Build();

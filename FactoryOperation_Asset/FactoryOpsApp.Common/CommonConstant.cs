@@ -527,6 +527,8 @@
             public const string AssetAdded = "Asset and tracking added successfully.";
             public const string AssetUpdated = "Asset and tracking updated successfully.";
             public const string AssetDeleted = "Asset and related records deleted successfully.";
+            public const string BulkAssetDeleted = "Bulk asset deletion completed successfully.";
+            public const string BulkDeleteFailed = "Bulk asset deletion encountered errors.";
             public const string AssetsFetched = "Assets retrieved successfully.";
             public const string TenantFetched = "Tenant data fetched successfully.";
 

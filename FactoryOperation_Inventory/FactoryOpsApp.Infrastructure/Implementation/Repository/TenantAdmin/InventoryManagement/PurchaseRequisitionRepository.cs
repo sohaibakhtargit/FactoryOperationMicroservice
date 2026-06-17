@@ -174,8 +174,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
                     Quantity = dto.Quantity,
                     Cost = dto.EstimatedCost,
                 };
-
-
                 await PublishKafkaEventAsyncc(dto.TenantId, dto.InventoryName, eventDto);
 
                 await context.SaveChangesAsync();
@@ -194,8 +192,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
 
             return response;
         }
-
-
         private async Task PublishKafkaEventAsyncc(int tenantId, string inventoryName, InventoryEventDto eventDto)  
         {
             var correlationId = Guid.NewGuid().ToString();
@@ -224,17 +220,13 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
             var kafkaResponse = await httpClient.PostAsync(ConstantUrls.kafkaPublish, jsonContent);
             kafkaResponse.EnsureSuccessStatusCode();
         }
-
-
         public async Task<CommonResponseModel> UpdatePurchaseRequestAsync(PurchaseRequest dto)
         {
             var response = new CommonResponseModel();
-
             using var context = _tenantDbContextFactory.GetTenantDbContext(dto.TenantId);
 
             try
             {
-            
                 var existingRequisition = await context.PurchaseRequisitions
                     .FirstOrDefaultAsync(x =>
                         x.PurchaseRequisitionId == dto.PurchaseRequisitionId &&
@@ -247,15 +239,12 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
                     response.StatusMessage = "Purchase Requisition Not Found";
                     return response;
                 }
-
-             
                 existingRequisition.RequisitionId = dto.RequisitionId;
                 existingRequisition.ReorderRuleId = dto.ReorderRuleId;
                 existingRequisition.InventoryId = dto.InventoryId;
                 existingRequisition.Quantity = dto.Quantity;
                 existingRequisition.EstimatedCost = dto.EstimatedCost;
                 existingRequisition.Priority = dto.Priority;
-     
                 existingRequisition.GeneratedDate = dto.GeneratedDate;
                 existingRequisition.ManagerAprovalStatus = dto.ManagerAprovalStatus;
                 existingRequisition.SupplierManagementId = dto.SupplierManagementId;
@@ -265,9 +254,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
                 existingRequisition.ExpectedDeliveryDate = dto.ExpectedDeliveryDate;
                 existingRequisition.UpdatedBy = dto.UpdatedBy ?? dto.CreatedBy;
                 existingRequisition.UpdatedDate = DateTime.UtcNow;
-
-
-
                if (dto.ManagerAprovalStatus == ManagerAprovalStatus.Approved)
                 {
                     var eventDto = new InventoryEventDto
@@ -306,10 +292,7 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.InventoryManagemen
                 response.StatusCode = StatusCode.Error;
                 response.StatusMessage = "Purchase Requisition Update Failed";
             }
-
             return response;
         }
-
     }
-
 }

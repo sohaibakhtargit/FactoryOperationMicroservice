@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using static FactoryOpsApp.Common.CommonConstant;
 
 using FactoryOperation_Asset.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.ExceptionLogger;
+using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 
 namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
 {
@@ -25,6 +26,76 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
             _exceptionLogger = exceptionLogger;
             _auditLogger = auditLogger;
         }
+        public async Task<GetAllRecord<DashboardDataDto>> FetchDashboardDataAsync(int tenantId)
+        {
+            var response = new GetAllRecord<DashboardDataDto>();
+
+            try
+            {
+                using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+
+                int totalHighCriticalAssets = await tenantDb.AssetRegistry
+                    .CountAsync(x => !x.IsDeleted && x.Criticality == AssetRegistry.CriticalityLevel.High);
+
+                int totalMediumCriticalAssets = await tenantDb.AssetRegistry
+                    .CountAsync(x => !x.IsDeleted && x.Criticality == AssetRegistry.CriticalityLevel.Medium);
+
+                int totalLowCriticalAssets = await tenantDb.AssetRegistry
+                    .CountAsync(x => !x.IsDeleted && x.Criticality == AssetRegistry.CriticalityLevel.Low);
+
+                WorkOrderStatus?[] excludedStatuses =
+                {
+                    WorkOrderStatus.Inactive,
+                    WorkOrderStatus.Completed,
+                    WorkOrderStatus.Overdue,
+                    WorkOrderStatus.Cancelled
+                };
+                int totalActiveWorkOrders = await tenantDb.WorkOrders
+                  .CountAsync(x =>
+                      !x.IsDeleted &&
+                      x.IsActive &&
+                      !excludedStatuses.Contains(x.Status)
+                  );
+
+                int totalActiveTechnicians =
+                    await tenantDb.FactoryUsers
+                        .Where(u => !u.IsDeleted && u.IsActive)
+                        .Join(
+                            tenantDb.FactoryUserRoles,
+                            user => user.UserId,
+                            userRole => userRole.UserId,
+                            (user, userRole) => new { user, userRole }
+                        )
+                        .Join(
+                            tenantDb.FactoryRoles,
+                            combined => combined.userRole.RoleId,
+                            role => role.RoleId,
+                            (combined, role) => new { combined.user, role }
+                        )
+                        .CountAsync(x => x.role.RoleName == "Technician");
+
+
+                var dashboardData = new DashboardDataDto
+                {
+                    HighCriticalAssetsCount = totalHighCriticalAssets,
+                    MediumCriticalAssetsCount = totalMediumCriticalAssets,
+                    LowCriticaAssetsCount = totalLowCriticalAssets,
+                    TotalActiveWorkOrder = totalActiveWorkOrders,
+                    totalActiveTechnicians = totalActiveTechnicians
+                };
+
+                response.GetAllData = new List<DashboardDataDto> { dashboardData };
+                response.StatusCode = "200";
+                response.StatusMessage = "Dashboard data fetched successfully";
+                return response;
+            }
+            catch (Exception ex)
+            {
+                response.StatusCode = "500";
+                response.StatusMessage = "Failed to fetch dashboard data: " + ex.Message;
+                return response;
+            }
+        }
 
         public async Task<GetAllRecord<DashboardSummaryDto>> GetDashboardSummaryAsync(int tenantId)
         {
@@ -35,13 +106,11 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
                 var today = DateTime.UtcNow;
 
-                // Basic counts
                 int totalAssets = await tenantDb.AssetRegistry.CountAsync(x => !x.IsDeleted);
                 int running = await tenantDb.AssetRegistry.CountAsync(x => x.IsActive && !x.IsDeleted);
                 int maintenance = await tenantDb.AssetRegistry.CountAsync(x => x.Department == "Maintenance" && !x.IsDeleted);
                 int idle = totalAssets - running - maintenance;
 
-                // Retirement planning
                 var next12Months = await tenantDb.AssetRegistry
                     .CountAsync(x => !x.IsDeleted && x.WarrantyExpiry != null && x.WarrantyExpiry <= today.AddMonths(12));
 
@@ -53,7 +122,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                 var fivePlusYears = await tenantDb.AssetRegistry
                     .CountAsync(x => !x.IsDeleted && x.WarrantyExpiry > today.AddYears(5));
 
-                // Utilization DTO
                 var utilization = new AssetUtilizationDto
                 {
                     RunningAssets = running,
@@ -64,7 +132,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     IdlePercentage = totalAssets > 0 ? idle * 100.0 / totalAssets : 0
                 };
 
-                // Categories
                 var categories = await tenantDb.AssetRegistry
                     .Where(x => !x.IsDeleted)
                     .GroupBy(x => x.FactoryAssetType.Type_Name)
@@ -76,7 +143,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     })
                     .ToListAsync();
 
-                // Retirement planning DTO
                 var retirementPlanning = new RetirementPlanningDto
                 {
                     Next12Months = next12Months,
@@ -84,7 +150,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     FivePlusYears = fivePlusYears
                 };
 
-                // Top maintenance costs
                 var topMaintenanceCosts = await (
                     from m in tenantDb.MaintenanceHistory
                     join a in tenantDb.AssetRegistry on m.AssetId equals a.AssetId
@@ -102,7 +167,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     .Take(5)
                     .ToListAsync();
 
-                // Core metrics
                 double overallUptime = totalAssets > 0 ? running * 100.0 / totalAssets : 0;
 
                 int totalMaintenances = await tenantDb.MaintenanceHistory
@@ -139,8 +203,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     ComplianceRate = complianceRate
                 };
 
-                // -------------------- Downtime calculation using AssetTracking --------------------
-                // Fetch asset tracking rows that have any accumulated downtime OR are currently down
                 var tracked = await tenantDb.AssetTracking
                     .Where(x => !x.IsDeleted && (x.TotalDownAccumulatedMinutes != null || x.Status == Domain.Entities.FactoryOpsTenants.AssetTrackingStatusEnum.Down))
                     .Select(x => new
@@ -153,10 +215,8 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     })
                     .ToListAsync();
 
-                // total minutes from accumulated stored values
                 double totalDowntimeMinutes = tracked.Sum(t => t.DownAccumulated);
 
-                // add live duration for currently-down assets
                 var now = DateTime.UtcNow;
                 var currentlyDownList = tracked.Where(t => t.Status == Domain.Entities.FactoryOpsTenants.AssetTrackingStatusEnum.Down && t.DownStart.HasValue).ToList();
 
@@ -166,22 +226,18 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     if (liveMinutes > 0) totalDowntimeMinutes += liveMinutes;
                 }
 
-                // assets currently down count
                 int assetsCurrentlyDown = await tenantDb.AssetTracking
                     .CountAsync(x => x.Status == Domain.Entities.FactoryOpsTenants.AssetTrackingStatusEnum.Down && !x.IsDeleted);
 
-                // assets that have any downtime record (accumulated or currently down)
                 int assetsWithDowntime = tracked.Select(t => t.AssetId).Distinct().Count();
 
                 double averageDowntimeMinutes = assetsWithDowntime > 0 ? totalDowntimeMinutes / assetsWithDowntime : 0;
                 double totalDowntimeHours = totalDowntimeMinutes / 60.0;
 
-                // downtime percentage relative to total assets in one day baseline
                 double downtimePercentage = totalAssets > 0
                     ? (totalDowntimeMinutes / (totalAssets * 24 * 60)) * 100
                     : 0;
 
-                // Build downtime DTO: we will place it inside DashboardSummaryDto as DowntimeMetrics
                 var downtimeDto = new AssetDashboardReportDto
                 {
                     AssetsCurrentlyDown = assetsCurrentlyDown,
@@ -189,7 +245,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     TotalDowntimeHours = Math.Round(totalDowntimeHours, 2),
                     DowntimePercentage = Math.Round(downtimePercentage, 2),
 
-                    // keep asset status & planning fields in top-level report dto to match your flattened DTO
                     RunningAssets = running,
                     MaintenanceAssets = maintenance,
                     IdleAssets = idle,
@@ -201,7 +256,6 @@ namespace FactoryOpsApp.Infrastructure.Repository.TenantAdmin.AssetManagement
                     IsActive = true
                 };
 
-                // Final summary DTO
                 var dashboardSummary = new DashboardSummaryDto
                 {
                     AssetUtilization = utilization,

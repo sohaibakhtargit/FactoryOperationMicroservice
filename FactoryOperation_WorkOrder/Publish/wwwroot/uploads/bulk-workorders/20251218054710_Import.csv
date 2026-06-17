@@ -1,0 +1,8 @@
+Title,Description,LocationId,Priority,WorkOrderType,AssignedToUserId,AssignedToTeamId,DueDate,ScheduleDate,EstimatedDurationMinutes,AssetId,Instructions,LaborCost,PartCost,ToolId,QuantityRequired
+Lathe Machin,Finishing quality is not good ,46,Low,Preventive,,,12/18/2025 0:00,12/18/2025 0:00,0,21,Quality should be good,50,90,11,2
+Hydraulic Jeck , Jeck not working when load is high,46,Low,Preventive,,,12/18/2025 0:00,12/18/2025 0:00,0,13,Work with Safety ,50,90,11,2
+CNC Machines,Connectivity issue,46,Low,Preventive,,,12/18/2025 0:00,12/18/2025 0:00,0,13,Work is on high priority,50,90,11,2
+Surface Grinder,Machine Starting Issue,46,Low,Preventive,,,12/19/2025 0:00,12/19/2025 0:00,0,21,should be finished within time,50,90,11,2
+Conveyor Belt System,Belt routine Check,46,Low,Preventive,,,12/20/2025 0:00,12/20/2025 0:00,0,13,Worked Quality,50,90,10,2
+Robotic Arm,Connectivity issue,46,Low,Preventive,,,12/21/2025 0:00,12/21/2025 0:00,0,13,Work with safety ,50,90,10,2
+Edge Grinding Machine+++++++++,Edge Finishing Quality not good,46,Low,Preventive,,,12/22/2025 0:00,12/22/2025 0:00,0,21,Work with safety ,50,90,10,2

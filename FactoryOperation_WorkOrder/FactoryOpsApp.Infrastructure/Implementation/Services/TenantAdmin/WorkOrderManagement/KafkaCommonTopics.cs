@@ -20,7 +20,6 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
             if (string.IsNullOrWhiteSpace(actionType))
                 throw new ArgumentException("Action type cannot be empty", nameof(actionType));
 
-            // Identify API or controller name
             var stackTrace = new StackTrace();
             var frame = stackTrace.GetFrame(1);
             var method = frame?.GetMethod();
@@ -28,13 +27,12 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
             string apiName = method?.DeclaringType?.Name ?? "unknown";
             apiName = CleanAsyncMethodName(apiName);
 
-            // Remove suffix like "Controller"
             apiName = apiName
                 .Replace("Controller", "")
                 .Replace("Api", "")
                 .ToLowerInvariant();
 
-            // Format: factoryops.<entity>.<tenant>.<event>
+            
             return $"factoryops.{apiName}.{tenantId}.{actionType.ToLowerInvariant()}";
         }
 
@@ -42,6 +40,28 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
         {
             var match = Regex.Match(apiName, @"<(.+?)>");
             return match.Success ? match.Groups[1].Value : apiName;
+        }
+
+        public static string BuildTopicNameWorkOrderProgressTest(
+    int tenantId,
+    string apiName,
+    string actionType)
+        {
+            if (tenantId <= 0)
+                throw new ArgumentNullException(nameof(tenantId));
+
+            if (string.IsNullOrWhiteSpace(apiName))
+                throw new ArgumentException("Api name cannot be empty", nameof(apiName));
+
+            if (string.IsNullOrWhiteSpace(actionType))
+                throw new ArgumentException("Action type cannot be empty", nameof(actionType));
+
+            apiName = apiName
+                .Replace("Controller", "")
+                .Replace("Api", "")
+                .ToLowerInvariant();
+
+            return $"factoryops.{apiName}.{tenantId}.{actionType.ToLowerInvariant()}";
         }
 
     }

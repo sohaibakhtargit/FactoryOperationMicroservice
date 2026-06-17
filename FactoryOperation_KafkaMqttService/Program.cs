@@ -1,12 +1,16 @@
-using FactoryOperation_KafkaMqttService.FactoryOpsApp.Application.Interfaces.Repositories.IOTDevices;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Application.Interfaces.Repositories.KafkaMqttBridge;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Application.Interfaces.Services.EventTrace;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Application.Interfaces.Services.KafkaMqttBridge;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.ExceptionLogger;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.DBContext;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.Implementation.Services.TenantAdmin.ExceptionLogger;
-using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.Implementations.Repositories.IOTDevices;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.Implementations.Repositories.KafkaMqttBridge;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.Implementations.Services.EventTrace;
 using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.Implementations.Services.KafkaMqttBridge;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.Implementations.Services.Queue;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Config;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Interfaces;
+using FactoryOperation_KafkaMqttService.FactoryOpsApp.Shared.Services;
 using FactoryOperation_KafkaMqttService.Middleware;
 using FactoryOpsApp.Messaging.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -14,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using System.Reflection;
 using System.Text;
@@ -90,7 +95,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
          ValidIssuer = builder.Configuration["JwtSettings:Issuer"],
          ValidAudience = builder.Configuration["JwtSettings:Audience"],
          IssuerSigningKey = new SymmetricSecurityKey(
-             Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]))
+             Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Key"]!))
      };
 
      options.Events = new JwtBearerEvents
@@ -112,7 +117,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
  });
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -137,7 +141,20 @@ builder.Services.AddScoped<IKafkaConfigurationService, KafkaConfigurationService
 builder.Services.AddScoped<IMqttConfigurationService, MqttConfigurationService>();
 builder.Services.AddScoped<IBridgeConfigurationService, BridgeConfigurationService>();
 builder.Services.AddScoped<IExceptionLoggerService, ExceptionLoggerService>();
-builder.Services.AddScoped<ITelemetryRepository, TelemetryRepository>();
+
+//event trace logger    
+builder.Services.AddSingleton<EventTraceQueue>();
+//builder.Services.AddSingleton<IEventTraceLogger, FileEventTraceLogger>();
+builder.Services.AddScoped<IEventTraceLogger, DbEventTraceLogger>();
+
+builder.Services.AddHostedService<EventTraceWorker>();
+
+// once client provide Azure Blob Cred--
+//builder.Services.AddSingleton<IExternalPayloadStore, AzureBlobPayloadStore>();
+
+//--Local file storage in wwwroot folder
+builder.Services.AddSingleton<IExternalPayloadStore, LocalFilePayloadStore>();
+
 
 if (messagingEnabled)
 {
@@ -145,19 +162,48 @@ if (messagingEnabled)
     builder.Services.AddMessagingServices(builder.Configuration);
 }
 
+//builder.Services.AddOpenTelemetry()
+//    .WithTracing(t =>
+//    {
+//        t.AddAspNetCoreInstrumentation();
+//        t.AddHttpClientInstrumentation();
+//        t.AddSource("FactoryOpsTelemetry"); // your Telemetry.Activity source
+//        // Add exporter via config, e.g., OTLP
+//    })
+//    .WithMetrics(m =>
+//    {
+//        m.AddAspNetCoreInstrumentation();
+//        m.AddHttpClientInstrumentation();
+//    });
+
 builder.Services.AddOpenTelemetry()
-    .WithTracing(t =>
+    .ConfigureResource(r => r.AddService("FactoryOps.Messaging"))
+    .WithMetrics(metrics =>
     {
-        t.AddAspNetCoreInstrumentation();
-        t.AddHttpClientInstrumentation();
-        t.AddSource("FactoryOpsTelemetry"); // your Telemetry.Activity source
-        // Add exporter via config, e.g., OTLP
+        metrics
+            .AddRuntimeInstrumentation()
+            .AddAspNetCoreInstrumentation()
+            .AddMeter("FactoryOps.Messaging")
+            .AddPrometheusExporter()
+
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri("http://44.211.113.36:4317");
+                o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+            });
     })
-    .WithMetrics(m =>
+    .WithTracing(tracing =>
     {
-        m.AddAspNetCoreInstrumentation();
-        m.AddHttpClientInstrumentation();
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddSource("FactoryOps.Messaging")
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri("http://44.211.113.36:4317");
+                o.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+            });
     });
+
 
 //Kafka
 
@@ -168,15 +214,33 @@ builder.Services.AddSignalR(options =>
     options.EnableDetailedErrors = true;
 });
 
+builder.Services.Configure<BlobStorageSettings>(
+    builder.Configuration.GetSection("BlobStorage"));
+
+
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("CorsPolicy", builder =>
+//        builder
+//        .SetIsOriginAllowed(_ => true)
+//        .AllowAnyMethod()
+//        .AllowAnyHeader()
+//        .AllowCredentials()
+//        );
+//});
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("CorsPolicy", builder =>
-        builder
-        .SetIsOriginAllowed(_ => true)
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials()
-        );
+    options.AddPolicy("CorsPolicy", policy =>
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "https://ms.stagingsdei.com:8108"
+            )
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials());
 });
 
 builder.Services.AddHttpContextAccessor();
@@ -191,7 +255,6 @@ if (envMode == "Local" || envMode == "Staging")
     app.UseSwaggerUI();
 }
 
-
 app.MapHealthChecks("/health");
 app.UseCors("CorsPolicy");
 
@@ -205,6 +268,5 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
-
+app.MapPrometheusScrapingEndpoint();
 app.Run();

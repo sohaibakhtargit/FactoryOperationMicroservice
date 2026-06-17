@@ -187,7 +187,6 @@ namespace FactoryOperation_KafkaMqttService.FactoryOpsApp.Infrastructure.Impleme
                     response.StatusMessage = "Kafka configuration not found.";
                     return response;
                 }
-
                 entity.Name = dto.Name;
                 entity.Environment = dto.Environment;
                 entity.BootstrapServers = dto.BootstrapServers;

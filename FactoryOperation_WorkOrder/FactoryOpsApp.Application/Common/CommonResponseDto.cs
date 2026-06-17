@@ -11,6 +11,17 @@ namespace FactoryOpsApp.Application.Common
         public string? StatusCode { get; set; }
         public string? StatusMessage { get; set; }
     }
+
+    public class CommonWorkOrderResponseModel : CommonResponseModel
+    {
+        public int WorkOrderId { get; set; }
+    }
+
+    public class CommonServiceRequestResponseModel : CommonResponseModel
+    {
+        public int ServiceRequestId { get; set; }
+    }
+
     public class ResponseToken
     {
         public string? StatusCode { get; set; }
@@ -28,15 +39,15 @@ namespace FactoryOpsApp.Application.Common
     }
     public class CountResponseModel
     {
-        public string StatusCode { get; set; }
-        public string StatusMessage { get; set; }
+        public string? StatusCode { get; set; }
+        public string? StatusMessage { get; set; }
         public int Count { get; set; }
     }
 
     public class UserRoleCountResponseModel
     {
-        public string StatusCode { get; set; }
-        public string StatusMessage { get; set; }
+        public string? StatusCode { get; set; }
+        public string? StatusMessage { get; set; }
         public int AdminCount { get; set; }
         public int SupervisorCount { get; set; }
         public int TechnicianCount { get; set; }
@@ -46,8 +57,8 @@ namespace FactoryOpsApp.Application.Common
     public class EmailResponse
     {
         public bool Success { get; set; }
-        public string Message { get; set; }
-        public string MessageId { get; set; }
+        public string? Message { get; set; }
+        public string? MessageId { get; set; }
     }
     public class GetAllPagedRecord<T> : CommonResponseModel
     {

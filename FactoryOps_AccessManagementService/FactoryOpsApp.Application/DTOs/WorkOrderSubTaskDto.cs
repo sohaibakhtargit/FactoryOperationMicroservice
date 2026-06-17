@@ -75,8 +75,8 @@ namespace FactoryOpsApp.Application.DTOs
     public class WorkOrderWithSubTasksDto
     {
         public int WorkOrderId { get; set; }
-        public string WorkOrderNumber { get; set; }   // adjust property name as per WorkOrder entity
-        public string WorkOrderTitle { get; set; }    // adjust property name as per WorkOrder entity
+        public string WorkOrderNumber { get; set; }   
+        public string WorkOrderTitle { get; set; }  
         public string WorkOrderStatus { get; set; }
         public string WorkOrderPriority { get; set; }
         public int? EstimatedDurationInMinutes { get; set; }

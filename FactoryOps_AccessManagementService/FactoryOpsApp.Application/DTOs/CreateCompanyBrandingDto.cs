@@ -13,6 +13,7 @@ namespace FactoryOpsApp.Application.DTOs
         [Required]
         [MaxLength(255)]
         public string CompanyName { get; set; } = string.Empty;
+        public IFormFile? CompanyNameLogo { get; set;} 
         public IFormFile? CompanyImageFile { get; set; }
         public string? CompanyLogo { get; set; }
         public int? CreatedBy { get; set; }
@@ -29,6 +30,7 @@ namespace FactoryOpsApp.Application.DTOs
 
         public IFormFile? CompanyImageFile { get; set; }
         public string? CompanyLogo { get; set; }
+        public IFormFile? CompanyNameLogo { get; set; }
         public int? UpdatedBy { get; set; }
     }
 
@@ -36,6 +38,7 @@ namespace FactoryOpsApp.Application.DTOs
     {
         public int Id { get; set; }
         public string CompanyName { get; set; } = string.Empty;
+        public string? CompanyNameLogo { get; set; }
         public string? CompanyImage { get; set; }
         public string? CompanyLogo { get; set; }
         public bool IsActive { get; set; }

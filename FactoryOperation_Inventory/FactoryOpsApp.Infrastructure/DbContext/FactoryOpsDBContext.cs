@@ -1,4 +1,5 @@
-﻿using FactoryOpsApp.Domain.Entities;
+﻿using FactoryOperation_Inventory.FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
+using FactoryOpsApp.Domain.Entities;
 using FactoryOpsApp.Domain.Entities.FactoryOpsTenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,6 +51,8 @@ public class FactoryOpsDBContext : DbContext
 
     public DbSet<MaintenanceSchedule> MaintenanceSchedules { get; set; }
     public DbSet<WorkOrder> WorkOrders { get; set; }
+    public DbSet<WorkOrderProgressUpdates> WorkOrderProgressUpdates { get; set; }
+
     public DbSet<WorkOrderRequiredTool> WorkOrderRequiredTools { get; set; }
     public DbSet<MaintenanceTask> MaintenanceTasks { get; set; }
     public DbSet<WorkOrderSubTask> WorkOrderSubTasks { get; set; }
@@ -79,31 +82,48 @@ public class FactoryOpsDBContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
 
-        modelBuilder.Entity<FactoryUserRoles>()
-            .HasKey(ur => new { ur.UserId, ur.RoleId });
+        modelBuilder.Entity<FactoryUserRoles>(entity =>
+        {
+            entity.HasKey(ur => ur.UserRoleId);
 
-            modelBuilder.Entity<FactoryUserRoles>()
-                .HasOne(ur => ur.FactoryUsers)
-                .WithMany(u => u.FactoryUserRoles)
-                .HasForeignKey(ur => ur.UserId);
+            entity.Property(ur => ur.UserRoleId)
+                  .ValueGeneratedOnAdd();
 
-            modelBuilder.Entity<FactoryUserRoles>()
-                .HasOne(ur => ur.FactoryRoles)
-                .WithMany(r => r.FactoryUserRoles)
-                .HasForeignKey(ur => ur.RoleId);
+            entity.HasIndex(ur => new { ur.UserId, ur.RoleId })
+                  .IsUnique()
+                  .HasFilter("\"IsDeleted\" = false");
 
-            modelBuilder.Entity<FactoryRolePermissions>()
-                .HasKey(rp => new { rp.RoleId, rp.PermissionId });
+            entity.HasOne(ur => ur.FactoryUsers)
+                  .WithMany(u => u.FactoryUserRoles)
+                  .HasForeignKey(ur => ur.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<FactoryRolePermissions>()
-                .HasOne(rp => rp.FactoryRoles)
-                .WithMany(r => r.FactoryRolePermissions)
-                .HasForeignKey(rp => rp.RoleId);
+            entity.HasOne(ur => ur.FactoryRoles)
+                  .WithMany(r => r.FactoryUserRoles)
+                  .HasForeignKey(ur => ur.RoleId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<FactoryRolePermissions>(entity =>
+        {
+            entity.HasKey(rp => rp.RolePermissionId);
 
-            modelBuilder.Entity<FactoryRolePermissions>()
-                .HasOne(rp => rp.FactoryPermissions)
-                .WithMany(p => p.FactoryRolePermissions)
-                .HasForeignKey(rp => rp.PermissionId);
+            entity.Property(rp => rp.RolePermissionId)
+                  .ValueGeneratedOnAdd();
+
+            entity.HasIndex(rp => new { rp.RoleId, rp.PermissionId })
+                  .IsUnique()
+                  .HasFilter("\"IsDeleted\" = false");
+
+            entity.HasOne(rp => rp.FactoryRoles)
+                  .WithMany(r => r.FactoryRolePermissions)
+                  .HasForeignKey(rp => rp.RoleId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(rp => rp.FactoryPermissions)
+                  .WithMany(p => p.FactoryRolePermissions)
+                  .HasForeignKey(rp => rp.PermissionId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
 
         modelBuilder.Entity<FactoryTeam>()
              .HasOne(ft => ft.Manager)                  
@@ -302,7 +322,13 @@ public class FactoryOpsDBContext : DbContext
             .Property(w => w.WorkOrderType)
             .HasConversion<string>()
             .HasMaxLength(20);
+        modelBuilder.Entity<WorkOrderProgressUpdates>()
+            .Property(e => e.UpdateType)
+            .HasConversion<string>();
 
+        modelBuilder.Entity<WorkOrderProgressUpdates>()
+             .Property(e => e.Status)
+             .HasConversion<string>();
         modelBuilder.Entity<MaintenanceTask>()
             .Property(t => t.Status)
             .HasConversion<string>()

@@ -33,6 +33,23 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
             try
             {
+                var isDuplicate = await tenantDb.FactoryNotificationRules.AnyAsync(x =>
+                    x.TenantId == dto.TenantId &&
+                    x.TriggerEvent == dto.TriggerEvent &&
+                    x.DeliveryMethod == dto.DeliveryMethod &&
+                    x.RecipientType == dto.RecipientType &&
+                    x.RecipientId == dto.RecipientId &&
+                    !x.IsDeleted
+                );
+
+                if (isDuplicate)
+                {
+                    return new CommonResponseModel
+                    {
+                        StatusCode = StatusCode.BadRequest,
+                        StatusMessage = "Notification rule already exists."
+                    };
+                }
                 var entity = new FactoryNotificationRules
                 {
                     TenantId = dto.TenantId,
@@ -191,11 +208,30 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     return response;
                 }
 
+                var isDuplicate = await tenantDb.FactoryNotificationRules.AnyAsync(x =>
+                    x.RuleId != dto.RuleId &&   
+                    x.TenantId == dto.TenantId &&
+                    x.TriggerEvent == dto.TriggerEvent &&
+                    x.DeliveryMethod == dto.DeliveryMethod &&
+                    x.RecipientType == dto.RecipientType &&
+                    x.RecipientId == dto.RecipientId &&
+                    !x.IsDeleted
+                );
+
+                if (isDuplicate)
+                {
+                    return new CommonResponseModel
+                    {
+                        StatusCode = StatusCode.BadRequest,
+                        StatusMessage = "Notification rule already exists."
+                    };
+                }
+
                 existing.Name = dto.Name;
                 existing.TriggerEvent = dto.TriggerEvent;
                 existing.DeliveryMethod = dto.DeliveryMethod;
                 existing.RecipientType = dto.RecipientType;
-                existing.RecipientId = dto.RecipientId;
+                existing.RecipientId = dto.RecipientId!;
                 existing.EscalationTime = dto.EscalationTime;
                 existing.EscalationRecipient = dto.EscalationRecipient;
                 existing.UpdatedAt = DateTime.UtcNow;
@@ -208,6 +244,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     email: "",
                     eventType: "NotificationRule"
                 );
+
                 await tenantDb.SaveChangesAsync();
                 await _masterDbContext.SaveChangesAsync();
 

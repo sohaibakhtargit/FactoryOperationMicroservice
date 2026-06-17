@@ -58,28 +58,28 @@ namespace FactoryOpsApp.Application.DTOs
         public int Id { get; set; }
         public int TenantId { get; set; }
 
-        // Isolation Configuration
+        
         public string? IsolationLevel { get; set; }
         public string? DataRegion { get; set; }
         public string? ComplianceLevel { get; set; }
         public DateTime? LastAuditDate { get; set; }
         public decimal? MonthlyMaintenanceCost { get; set; }
 
-        // Validation Tests
+       
         public string? ValidationIsolationLevel { get; set; }
         public string? ValidationSchemaIsolation { get; set; }
         public string? ValidationFileStorage { get; set; }
         public string? ValidationApiAccessControl { get; set; }
         public DateTime? ValidationTimestamp { get; set; }
 
-        // Isolation Metrics
+       
         public decimal? MetricDataIntegrityScore { get; set; }
         public decimal? MetricAccessControl { get; set; }
         public decimal? MetricSchemaIsolation { get; set; }
         public decimal? MetricNetworkSegmentation { get; set; }
         public DateTime? MetricsTimestamp { get; set; }
 
-        // Security Stats (last 24h)
+       
         public int? AccessAttempts24H { get; set; }
         public int? BlockedRequests24H { get; set; }
         public int? PolicyViolations24H { get; set; }
@@ -93,28 +93,28 @@ namespace FactoryOpsApp.Application.DTOs
         public int Id { get; set; }
         public int TenantId { get; set; }
 
-        // Budget Cost Tracking
+        
         public string IsolationLevel { get; set; }
         public string DataRegion { get; set; }
         public string ComplianceLevel { get; set; }
         public DateTime? LastAuditDate { get; set; }
         public decimal? MonthlyMaintenanceCost { get; set; }
 
-        // Validation Tests
+        
         public string ValidationIsolationLevel { get; set; }
         public string ValidationSchemaIsolation { get; set; }
         public string ValidationFileStorage { get; set; }
         public string ValidationApiAccessControl { get; set; }
         public DateTime? ValidationTimestamp { get; set; }
 
-        // Isolation Metrics
+       
         public decimal? MetricDataIntegrityScore { get; set; }
         public decimal? MetricAccessControl { get; set; }
         public decimal? MetricSchemaIsolation { get; set; }
         public decimal? MetricNetworkSegmentation { get; set; }
         public DateTime? MetricsTimestamp { get; set; }
 
-        // Security Events (24h)
+        
         public int? AccessAttempts24h { get; set; }
         public int? BlockedRequests24h { get; set; }
         public int? PolicyViolations24h { get; set; }

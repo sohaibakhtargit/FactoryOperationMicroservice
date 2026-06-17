@@ -204,7 +204,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 DateTime utcNow = DateTime.UtcNow;
                 DateTime todayStart = utcNow.Date;
-                DateTime todayEnd = todayStart.AddDays(1); // exclusive upper bound
+                DateTime todayEnd = todayStart.AddDays(1); 
 
                 int count = tenantDb.FactorySupportTickets
                     .Where(t => t.Status == "Resolved" && t.CreatedAt >= todayStart && t.CreatedAt < todayEnd && !t.IsDeleted)

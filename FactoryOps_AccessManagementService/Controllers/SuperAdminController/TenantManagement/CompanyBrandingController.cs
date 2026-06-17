@@ -17,7 +17,6 @@ namespace FactoryOps_AccessManagementService.Controllers.SuperAdminController.Te
         {
             _iCompanyBrandingInfoService = iCompanyBrandingInfoService;
         }
-
         /// <summary>
         /// Create company branding
         /// Sets up company visual identity including logos and branding elements

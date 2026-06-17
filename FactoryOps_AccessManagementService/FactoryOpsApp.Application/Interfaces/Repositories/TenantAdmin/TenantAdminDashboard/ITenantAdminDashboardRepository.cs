@@ -4,7 +4,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Int
 {
     public interface ITenantAdminDashboardRepository
     {
-        //tenant dasboard
+      
 
         CountResponseModel GetUsersCount(int tenantId);
 

@@ -49,9 +49,6 @@ namespace FactoryOpsApp.Application.DTOs
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
         public int? LocationId { get; set; }
-
-        //public IFormFile? WorkOrderPhoto { get; set; }
-        //public string? WorkOrderPhotoPath { get; set; }
         public WorkOrderStatus? Status { get; set; } = WorkOrderStatus.Started;
         public PriorityLevel? Priority { get; set; } = PriorityLevel.Medium;
         public WorkOrderTypeEnum? WorkOrderType { get; set; } = WorkOrderTypeEnum.Corrective;
@@ -95,8 +92,9 @@ namespace FactoryOpsApp.Application.DTOs
             public string? Comments { get; set; }
             public DateTime? StartTime { get; set; }
             public DateTime? PauseTime { get; set; }
-        /*    public bool IsStartd { get; set; } = false;
-            public bool IsPaused { get; set; } = false;*/
+            public bool IsStartd { get; set; } = false;
+            public bool IsPaused { get; set; } = false;
+
             //    public Decimal TotalTime { get; set; } = 0;
             public string? TotalTime { get; set; }
             public string? Action { get; set; }

@@ -66,6 +66,11 @@ using FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Impl
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.TeamManagement;
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.TenantAdminDashboard;
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Service.TenantAdmin.TenantAdminManagement;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.DTOs;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Interfaces.Repositories.TenantAdmin.Analytic_Reports;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Analytic_Reports;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Repository.SuperAdmin.Analytics_Reports;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Repository.TenantAdmin.Analytic_Reports;
 using FactoryOpsApp.Infrastructure.DBContext;
 using FactoryOpsApp.Infrastructure.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -234,10 +239,15 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             services.Configure<SmtpSettings>(configuration.GetSection("SmtpSettings"));
             services.AddScoped<IEmailService, EmailService>();
 
+            //Backup&Restore Setting
+            services.Configure<BackupSettings>(configuration.GetSection("BackupSettings"));
 
             // SignalR
             services.AddSignalR(options => options.EnableDetailedErrors = true);
             services.AddScoped<INotificationService, NotificationService>();
+
+            services.AddScoped<ITechnicianDashboardService, TechnicianDashboardService>();
+            services.AddScoped<ITechnicianDashboardRepository, TechnicianDashboardRepository>();
 
             // HttpContext accessor
             services.AddHttpContextAccessor();

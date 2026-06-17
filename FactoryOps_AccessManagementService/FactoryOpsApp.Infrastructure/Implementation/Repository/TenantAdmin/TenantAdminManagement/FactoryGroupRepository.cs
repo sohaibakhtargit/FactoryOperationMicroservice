@@ -106,7 +106,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 group.UpdatedAt = DateTime.UtcNow;
                 group.UpdatedBy = dto.UpdatedBy;
 
-                var existingUsers = group.GroupUsers.ToList();
+                var existingUsers = group.GroupUsers!.ToList();
 
                 if (dto.UserIds != null && dto.UserIds.Any())
                 {
@@ -189,7 +189,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 group.DeletedAt = DateTime.UtcNow;
                 group.DeletedBy = tenantId;
 
-                foreach (var mapping in group.GroupUsers)
+                foreach (var mapping in group.GroupUsers!)
                 {
                     mapping.IsDeleted = true;
                     mapping.IsActive = false;
@@ -215,7 +215,8 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             {
                 var groups = await tenantDb.FactoryGroups
                     .Where(g => !g.IsDeleted).Include(l => l.Location)
-                    .Include(g => g.GroupUsers)
+                    .OrderByDescending(g => g.GroupId)
+                    .Include(g => g.GroupUsers)!
                         .ThenInclude(gu => gu.User)
                     .Select(g => new FactoryGroupGetDto
                     {
@@ -224,9 +225,9 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                         Name = g.Name,
                         Type = g.Type,
                         LocationId = g.LocationId,
-                        LocationName = g.Location.LocationName,
+                        LocationName = g.Location!.LocationName,
                         Description = g.Description,
-                        Users = g.GroupUsers.Select(u => new FactoryGroupUserDto
+                        Users = g.GroupUsers!.Select(u => new FactoryGroupUserDto
                         {
                             UserId = u.UserId,
                             FullName = u.User!.FirstName + " " + u.User!.LastName,
@@ -265,7 +266,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             try
             {
                 var group = await tenantDb.FactoryGroups.Include(l => l.Location)
-                    .Include(g => g.GroupUsers)
+                    .Include(g => g.GroupUsers!)
                         .ThenInclude(gu => gu.User)
                     .FirstOrDefaultAsync(g => g.GroupId == groupId && !g.IsDeleted);
 
@@ -283,9 +284,9 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     Name = group.Name,
                     Type = group.Type,
                     LocationId = group.LocationId,
-                    LocationName = group.Location.LocationName,
+                    LocationName = group.Location!.LocationName,
                     Description = group.Description,
-                    Users = group.GroupUsers.Select(u => new FactoryGroupUserDto
+                    Users = group.GroupUsers!.Select(u => new FactoryGroupUserDto
                     {
                         UserId = u.UserId,
                         FullName = u.User!.FirstName + " " + u.User!.LastName,

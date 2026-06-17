@@ -19,7 +19,6 @@ namespace FactoryOps_AccessManagementService.Controllers.SuperAdminController.Te
         {
             _iTenantService = iTenantService;
         }
-
         /// <summary>
         /// Add new tenant to the system
         /// Creates a new tenant with configured settings and permissions
@@ -164,6 +163,13 @@ namespace FactoryOps_AccessManagementService.Controllers.SuperAdminController.Te
         public async Task<IActionResult> GetAllModuleAsync(int TenantId)
         {
             var result = await _iTenantService.GetAllModuleAsync(TenantId);
+            return Ok(result);
+        }
+
+        [HttpGet("get-Dashboard-Organization-Information")]
+        public async Task<IActionResult> GetDashboard(int tenantId)
+        {
+            var result = await _iTenantService.GetTenantDashboard(tenantId);
             return Ok(result);
         }
     }

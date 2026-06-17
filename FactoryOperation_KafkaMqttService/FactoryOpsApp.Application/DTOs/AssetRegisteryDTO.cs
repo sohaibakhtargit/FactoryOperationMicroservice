@@ -71,7 +71,7 @@ namespace FactoryOpsApp.Application.DTOs
         public CriticalityLevel? Criticality { get; set; }
         public string? DocumentUrl { get; set; }
         public string? InsurancePolicyNumber { get; set; }
-        // Audit fields
+        
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public int? CreatedBy { get; set; }

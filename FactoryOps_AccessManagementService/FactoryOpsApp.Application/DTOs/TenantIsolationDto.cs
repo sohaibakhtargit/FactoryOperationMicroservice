@@ -15,6 +15,7 @@ namespace FactoryOpsApp.Application.DTOs
         public string? TenantName { get; set; }
         public bool CustomBranding { get; set; } = false;
         public IFormFile? Logo { get; set; }
+        public IFormFile? LogoText { get; set; }
         public string? LogoUrl { get; set; }
         public string? ColorScheme { get; set; }
         public string? DataPartitionId { get; set; }
@@ -28,6 +29,7 @@ namespace FactoryOpsApp.Application.DTOs
         public string? EncryptionKeyId { get; set; }
         public bool CustomBranding { get; set; }
         public string? LogoUrl { get; set; }
+        public string? LogoText { get; set; }
         public string? ColorScheme { get; set; }
         public string? DataPartitionId { get; set; }
     }

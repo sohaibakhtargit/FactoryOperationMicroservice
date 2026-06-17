@@ -54,6 +54,16 @@ namespace FactoryOpsApp.Infrastructure.Service.TenantAdmin.AssetManagement
         {
             return _repository.GetAssetLifecycleMetricsAsync(tenantId);
         }
+
+        public Task<GetAllRecordsCount<AssetLifeHistoryReportDTO>> GetAssetLifeHistoryReport(int tenantId, int assetId)
+        {
+            return _repository.GetAssetLifeHistoryReport(tenantId, assetId);
+        }
+
+        public Task<GetSpecificRecord<AssetLifecycleFinancialSummaryDTO>> GetAssetLifeCycleSummery(int tenatId)
+        {
+            return _repository.GetAssetLifeCycleSummery(tenatId);
+        }
     }
 
     public class AssetFinancialAnalysisService : IAssetFinancialAnalysisService

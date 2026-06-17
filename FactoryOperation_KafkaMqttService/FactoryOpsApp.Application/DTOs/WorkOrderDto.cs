@@ -75,7 +75,7 @@ namespace FactoryOpsApp.Application.DTOs
         public class WorkOrderToolDto
         {
             public int? ToolId { get; set; }
-            public string? ToolName { get; set; }   // ✅ add this field
+            public string? ToolName { get; set; }   
 
             public int? QuantityRequired { get; set; }
         }
@@ -105,7 +105,7 @@ namespace FactoryOpsApp.Application.DTOs
         public class WorkOrderEventDto
         {
             public int WorkOrderId { get; set; }
-            public string EventType { get; set; } // Created, Updated, Deleted
+            public string EventType { get; set; } 
             public int TenantId { get; set; }
             public string WorkOrderNumber { get; set; }
             public string Title { get; set; }

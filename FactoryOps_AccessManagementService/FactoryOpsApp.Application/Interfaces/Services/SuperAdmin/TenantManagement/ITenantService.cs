@@ -1,4 +1,5 @@
 ﻿using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Common;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Application.DTOs;
 
 namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.SuperAdmin.TenantManagement
@@ -17,5 +18,6 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Int
         public Task<CommonResponseModel> ForceLogout(int Id);
         public Task<CommonResponseModel> Suspend(int Id);
         public Task<GetAllRecord<ModulelistDto>> GetAllModuleAsync(int TenantId);
+        public Task<GetSpecificRecord<TenantDashboardDto>> GetTenantDashboard(int tenantId);
     }
 }

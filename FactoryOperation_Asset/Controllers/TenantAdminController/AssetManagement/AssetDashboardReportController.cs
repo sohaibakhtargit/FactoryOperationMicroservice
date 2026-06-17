@@ -31,5 +31,11 @@ namespace FactoryOpsApp.API.Controllers.TenantAdminContoller.AssetManagement
             var result = await _dashboardReportService.GetDashboardSummaryAsync(tenantId);
             return StatusCode(int.Parse(result.StatusCode), result);
         }
+        [HttpGet("Fetch_Dashboard_Data")]
+        public async Task<IActionResult> FetchDashboardDataAsync(int tenantId)
+        {
+            var result = await _dashboardReportService.FetchDashboardDataAsync(tenantId);
+            return StatusCode(int.Parse(result.StatusCode), result);
+        }
     }
 }

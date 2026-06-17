@@ -2,11 +2,14 @@
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Common;
 using FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.ExceptionLogger;
 using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Common;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.DTOs;
+using FactoryOps_AccessManagementService.FactoryOpsApp.Application.Interfaces.Services.Security;
 using FactoryOpsApp.Application.DTOs;
 using FactoryOpsApp.Domain.Entities.MasterTenantsAdmin;
 using FactoryOpsApp.Infrastructure.DBContext;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using StackExchange.Redis;
 using static FactoryOps_AccessManagementService.FactoryOpsApp.Common.CommonConstant;
 
 namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.Implementation.Repository.SuperAdmin.TenantManagement
@@ -21,13 +24,19 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         private readonly IEmailService _iEmailService;
         private readonly IFileStorageService _fileStorageService;
         private readonly IExceptionLoggerService _exceptionLogger;
+        private readonly IPasswordHasher _hasher;
+        private readonly IConnectionMultiplexer _redis;
+
         public TenantRepository(IConfiguration configuration,
             ILogger<TenantRepository> logger,
             MasterFactoryOpsDbContext masterDbcontext,
             IHttpContextAccessor httpContextAccessor,
             TenantDbContextFactory tenantDbContext,
             IEmailService iEmailService,
-            IFileStorageService fileStorageService, IExceptionLoggerService exceptionLogger)
+            IFileStorageService fileStorageService, 
+            IExceptionLoggerService exceptionLogger,
+            IPasswordHasher hasher,
+            IConnectionMultiplexer redis)
         {
             _configuration = configuration;
             _logger = logger;
@@ -37,6 +46,8 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             _fileStorageService = fileStorageService;
             _exceptionLogger = exceptionLogger;
             _tenantDbContext = tenantDbContext;
+            _hasher = hasher;
+            _redis = redis;
         }
         public async Task<bool> CloneTenantDatabaseAsync(string newTenantDbName, string templateDbName = "FactoryOperation")
         {
@@ -47,7 +58,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 await using var connection = new NpgsqlConnection(masterConnectionString);
                 await connection.OpenAsync();
 
-                // 1. First terminate all connections to the template DB
+            
                 var terminateConnectionsCommand = $@"
                 SELECT pg_terminate_backend(pg_stat_activity.pid)
                 FROM pg_stat_activity
@@ -59,16 +70,14 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     await terminateCmd.ExecuteNonQueryAsync();
                 }
 
-                // 2. Now create the new database
-                var DbName = "FactoryOperation_" + newTenantDbName;
-                var createDbCommand = $@"CREATE DATABASE ""{DbName}"" WITH TEMPLATE ""{templateDbName}"";";
+                var createDbCommand = $@"CREATE DATABASE ""{newTenantDbName}"" WITH TEMPLATE ""{templateDbName}"";";
 
                 _logger.LogInformation("Executing DB clone: {Sql}", createDbCommand);
 
                 await using var cmd = new NpgsqlCommand(createDbCommand, connection);
                 await cmd.ExecuteNonQueryAsync();
 
-                _logger.LogInformation("Database cloned successfully for tenant {DB}", DbName);
+                _logger.LogInformation("Database cloned successfully for tenant {DB}", newTenantDbName);
                 return true;
             }
             catch (Exception ex)
@@ -77,11 +86,202 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 return false;
             }
         }
+        //public async Task<CommonResponseModel> AddTenant(AddTenantDto tenant)
+        //{
+        //    CommonResponseModel response = new();
+        //    using var tran = await _masterDbcontext.Database.BeginTransactionAsync();
+        //    int TenantId = 0;
+        //    try
+        //    {
+        //        var existing = await _masterDbcontext.FactoryTenants
+        //            .FirstOrDefaultAsync(t =>
+        //                (t.TenantName == tenant.TenantName || t.AdminEmail == tenant.AdminEmail)
+        //                && t.IsDeleted == false
+        //                && t.IsActive == true);
+
+        //        if (existing != null)
+        //        {
+        //            response.StatusCode = StatusCode.BadRequest;
+        //            response.StatusMessage = TenantStatusMessage.BadRequest;
+        //            return response;
+        //        }
+
+        //        string? relativePath = null;
+        //        byte[]? imageBytes = null;
+
+        //        if (tenant.EnableBranding)
+        //        {
+        //            if (tenant.ImageFile == null)
+        //            {
+        //                throw new ArgumentNullException(nameof(tenant.ImageFile), "Image file is required when branding is enabled");
+        //            }
+
+        //            relativePath = await _fileStorageService.SaveFileAsync(tenant.ImageFile, "Images");
+        //            imageBytes = await File.ReadAllBytesAsync(Path.Combine("wwwroot", relativePath));
+        //        }
+        //        var tempPassword = tenant.TenantName + "@123";
+        //        var hashedPassword = _hasher.Hash(tempPassword);
+
+        //        var objTenant = new FactoryTenants
+        //        {
+        //            TenantName = tenant.TenantName,
+        //            DomainOrSubdomain = tenant.DomainOrSubdomain,
+        //            AdminEmail = tenant.AdminEmail,
+        //            IndustryType = tenant.IndustryType ?? "",
+        //            Plan = tenant.Plan,
+        //            Status = tenant.Status,
+        //            MaxUsers = tenant.MaxUsers,
+        //            MaxAssets = tenant.MaxAssets,
+        //            MaxStorage = tenant.MaxStorage,
+        //            LastActiveDate = tenant.LastActiveDate,
+        //            EnableBranding = tenant.EnableBranding,
+        //            ImageName = imageBytes,
+        //            BrandingLogoUrl = relativePath,
+        //            TimeZone = tenant.TimeZone,
+        //            DefaultLanguage = tenant.DefaultLanguage,
+        //            IsActive = true,
+        //            IsDeleted = false,
+        //            CreatedAt = DateTime.UtcNow,
+        //            CreatedBy = 1,
+        //        };
+        //        await _masterDbcontext.FactoryTenants.AddAsync(objTenant);
+
+        //        await _masterDbcontext.TenantIsolations.AddAsync(new TenantIsolation
+        //        {
+        //            TenantId = objTenant.TenantId,
+        //            TenantName = objTenant.TenantName,
+        //            CustomBranding = objTenant.EnableBranding,
+        //            LogoUrl = objTenant.BrandingLogoUrl,
+        //            LogoText = null, // if not available
+        //            DataEncryption = "Disabled"
+        //        });
+        //        await _masterDbcontext.SaveChangesAsync();
+
+        //        TenantId = objTenant.TenantId;
+        //        var safeDbName = GenerateSafeDbName(tenant.TenantName);
+
+        //        var TenantMasterMapping = new TenantMasterMapping()
+        //        {
+        //            TenantName = tenant.TenantName,
+        //            DbName = safeDbName,
+        //            TenantId = objTenant.TenantId,
+        //            IsActive = true,
+        //            IsDeleted = false,
+        //            CreatedAt = DateTime.UtcNow,
+        //            CreatedBy = 1,
+        //        };
+        //        await _masterDbcontext.TenantMasterMapping.AddAsync(TenantMasterMapping);
+
+        //        var TenantAdminLogin = new TenantAdminLogin()
+        //        {
+        //            Email = tenant.AdminEmail,
+        //            PasswordHash = hashedPassword,
+        //            RoleId = 2,
+        //            TenantId = objTenant.TenantId,
+        //            IsActive = true,
+        //            IsDeleted = false,
+        //            CreatedAt = DateTime.UtcNow,
+        //            CreatedBy = 1,
+        //        };
+        //        await _masterDbcontext.TenantAdminLogins.AddAsync(TenantAdminLogin);
+
+        //        var allModules = await _masterDbcontext.ModuleMaster
+        //            .Where(m => m.IsActive && !m.IsDeleted)
+        //            .ToListAsync();
+
+        //        if (allModules.Any())
+        //        {
+        //            var moduleMappings = allModules.Select(m => new ModuleMasterMapping
+        //            {
+        //                TenantId = TenantId,
+        //                ModuleId = m.ModuleId,
+        //                IsActive = true,
+        //                IsDeleted = false,
+        //                CreatedBy = 1,
+        //                CreatedAt = DateTime.UtcNow
+        //            }).ToList();
+
+        //            await _masterDbcontext.ModuleMasterMapping.AddRangeAsync(moduleMappings);
+        //        }
+
+        //        var ctx = _httpContextAccessor.HttpContext;
+        //        var auditData = new Audit_Log_MasterDb()
+        //        {
+        //            Action = "Create",
+        //            Details = "Tenant-Added",
+        //            EventType = "",
+        //            TenantId = null,
+        //            Email = "",
+        //            Timestamp = DateTime.UtcNow,
+        //            IsActive = true,
+        //            IsDeleted = false,
+        //            UserName = Environment.UserName,
+        //            Ipaddress = ctx?.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+        //        };
+
+        //        await _masterDbcontext.Audit_Log_MasterDb.AddAsync(auditData);
+        //        await _masterDbcontext.SaveChangesAsync();
+        //        await tran.CommitAsync();
+
+        //        //var dbName = tenant.TenantName;
+
+        //        var dbCreated = await CloneTenantDatabaseAsync(safeDbName);
+
+        //        if (!dbCreated)
+        //        {
+        //            response.StatusCode = StatusCode.Error;
+        //            response.StatusMessage = TenantStatusMessage.DBError;
+        //            return response;
+        //        }
+
+        //        var emailDto = new EmailDTO
+        //        {
+        //            From = "shoaibmaliklenovo@gmail.com",
+        //            To = tenant.AdminEmail ?? "factory.operation@yopmail.com",
+        //            Subject = "Your New Account Credentials",
+        //            Body = $@"<html>
+        //        <body>
+        //            <h2>Welcome, {tenant.TenantName}!</h2>
+        //            <p>Your account has been successfully created.</p>
+        //            <p><strong>Email:</strong> {tenant.AdminEmail}</p>
+        //            <p><strong>Temporary Password:</strong> {tempPassword}</p>
+        //            <p>Please change your password after first login.</p>
+        //        </body>
+        //        </html>"
+        //        };
+
+        //        var emailResponse = await _iEmailService.SendEmailAsync(emailDto);
+        //        if (!emailResponse.Success)
+        //        {
+        //            response.StatusCode = StatusCode.Error;
+        //            response.StatusMessage = TenantStatusMessage.EmailError;
+        //        }
+
+        //        response.StatusCode = StatusCode.Success;
+        //        response.StatusMessage = TenantStatusMessage.TenantAdded;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        await tran.RollbackAsync();
+        //        await _exceptionLogger.LogExceptionAsync(
+        //            ex,
+        //            sourceModule: "TenantModule",
+        //            apiName: "Add-Tenant",
+        //            tenantId: TenantId,
+        //            userId: null
+        //        );
+        //        response.StatusCode = StatusCode.Error;
+        //        response.StatusMessage = ex.Message;
+        //    }
+        //    return response;
+        //}
+
         public async Task<CommonResponseModel> AddTenant(AddTenantDto tenant)
         {
             CommonResponseModel response = new();
             using var tran = await _masterDbcontext.Database.BeginTransactionAsync();
             int TenantId = 0;
+
             try
             {
                 var existing = await _masterDbcontext.FactoryTenants
@@ -103,13 +303,14 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 if (tenant.EnableBranding)
                 {
                     if (tenant.ImageFile == null)
-                    {
-                        throw new ArgumentNullException(nameof(tenant.ImageFile), "Image file is required when branding is enabled");
-                    }
+                        throw new ArgumentNullException(nameof(tenant.ImageFile));
 
                     relativePath = await _fileStorageService.SaveFileAsync(tenant.ImageFile, "Images");
                     imageBytes = await File.ReadAllBytesAsync(Path.Combine("wwwroot", relativePath));
                 }
+
+                var tempPassword = tenant.TenantName + "@123";
+                var hashedPassword = _hasher.Hash(tempPassword);
 
                 var objTenant = new FactoryTenants
                 {
@@ -133,35 +334,47 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = 1,
                 };
+
                 await _masterDbcontext.FactoryTenants.AddAsync(objTenant);
                 await _masterDbcontext.SaveChangesAsync();
 
                 TenantId = objTenant.TenantId;
 
-                var TenantMasterMapping = new TenantMasterMapping()
+                //ADD Isolation inside transaction
+                await _masterDbcontext.TenantIsolations.AddAsync(new TenantIsolation
+                {
+                    TenantId = TenantId,
+                    TenantName = objTenant.TenantName,
+                    CustomBranding = objTenant.EnableBranding,
+                    LogoUrl = objTenant.BrandingLogoUrl,
+                    LogoText = null,
+                    DataEncryption = "Disabled"
+                });
+
+                var safeDbName = GenerateSafeDbName(tenant.TenantName);
+
+                await _masterDbcontext.TenantMasterMapping.AddAsync(new TenantMasterMapping
                 {
                     TenantName = tenant.TenantName,
-                    DbName = "FactoryOperation_" + tenant.TenantName,
-                    TenantId = objTenant.TenantId,
+                    DbName = safeDbName,
+                    TenantId = TenantId,
                     IsActive = true,
                     IsDeleted = false,
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = 1,
-                };
-                await _masterDbcontext.TenantMasterMapping.AddAsync(TenantMasterMapping);
+                });
 
-                var TenantAdminLogin = new TenantAdminLogin()
+                await _masterDbcontext.TenantAdminLogins.AddAsync(new TenantAdminLogin
                 {
                     Email = tenant.AdminEmail,
-                    PasswordHash = tenant.TenantName + "@123",
+                    PasswordHash = hashedPassword,
                     RoleId = 2,
-                    TenantId = objTenant.TenantId,
+                    TenantId = TenantId,
                     IsActive = true,
                     IsDeleted = false,
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = 1,
-                };
-                await _masterDbcontext.TenantAdminLogins.AddAsync(TenantAdminLogin);
+                });
 
                 var allModules = await _masterDbcontext.ModuleMaster
                     .Where(m => m.IsActive && !m.IsDeleted)
@@ -182,27 +395,21 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     await _masterDbcontext.ModuleMasterMapping.AddRangeAsync(moduleMappings);
                 }
 
-                var ctx = _httpContextAccessor.HttpContext;
-                var auditData = new Audit_Log_MasterDb()
+                await _masterDbcontext.Audit_Log_MasterDb.AddAsync(new Audit_Log_MasterDb
                 {
                     Action = "Create",
                     Details = "Tenant-Added",
-                    EventType = "",
                     TenantId = null,
-                    Email = "",
                     Timestamp = DateTime.UtcNow,
                     IsActive = true,
                     IsDeleted = false,
                     UserName = Environment.UserName,
-                    Ipaddress = ctx?.Connection.RemoteIpAddress?.ToString(),
-                };
+                    Ipaddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                });
 
-                await _masterDbcontext.Audit_Log_MasterDb.AddAsync(auditData);
                 await _masterDbcontext.SaveChangesAsync();
-                await tran.CommitAsync();
 
-                var dbName = tenant.TenantName;
-                var dbCreated = await CloneTenantDatabaseAsync(dbName);
+                var dbCreated = await CloneTenantDatabaseAsync(safeDbName);
 
                 if (!dbCreated)
                 {
@@ -211,17 +418,18 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     return response;
                 }
 
+                await tran.CommitAsync();
                 var emailDto = new EmailDTO
                 {
                     From = "shoaibmaliklenovo@gmail.com",
-                    To = "factory.operation@yopmail.com",
+                    To = tenant.AdminEmail ?? "factory.operation@yopmail.com",
                     Subject = "Your New Account Credentials",
                     Body = $@"<html>
                 <body>
                     <h2>Welcome, {tenant.TenantName}!</h2>
                     <p>Your account has been successfully created.</p>
                     <p><strong>Email:</strong> {tenant.AdminEmail}</p>
-                    <p><strong>Temporary Password:</strong> {tenant.TenantName + "@123"}</p>
+                    <p><strong>Temporary Password:</strong> {tempPassword}</p>
                     <p>Please change your password after first login.</p>
                 </body>
                 </html>"
@@ -240,16 +448,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             catch (Exception ex)
             {
                 await tran.RollbackAsync();
-                await _exceptionLogger.LogExceptionAsync(
-                    ex,
-                    sourceModule: "TenantModule",
-                    apiName: "Add-Tenant",
-                    tenantId: TenantId,
-                    userId: null
-                );
+                await _exceptionLogger.LogExceptionAsync(ex, "TenantModule", "Add-Tenant", TenantId, null);
                 response.StatusCode = StatusCode.Error;
                 response.StatusMessage = ex.Message;
             }
+
             return response;
         }
 
@@ -259,7 +462,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
             try
             {
-                string baseUrl = _configuration["BaseUrl:Staging"] ?? "https://ms.stagingsdei.com:8107";
+                string baseUrl = _configuration["BaseUrl:Staging"] ?? "https://ms.stagingsdei.com:8128";
 
                 var tenants = await _masterDbcontext.FactoryTenants
                     .Where(t => !t.IsDeleted)
@@ -371,7 +574,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 response.StatusMessage = TenantStatusMessage.DataFetched;
                 response.GetAllData = tenantList;
             }
-            catch (Exception ex)
+            catch (Exception ex) 
             {
                 await _exceptionLogger.LogExceptionAsync(
                     ex,
@@ -422,6 +625,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
         public async Task<CommonResponseModel> UpdateTenants(AddTenantDto tenant)
         {
             CommonResponseModel response = new();
+            using var tran = await _masterDbcontext.Database.BeginTransactionAsync();
 
             try
             {
@@ -463,7 +667,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 existing.TenantName = tenant.TenantName;
                 existing.DomainOrSubdomain = tenant.DomainOrSubdomain;
                 existing.AdminEmail = tenant.AdminEmail;
-                existing.IndustryType = tenant.IndustryType;
+                existing.IndustryType = tenant.IndustryType!;
                 existing.Plan = tenant.Plan;
                 existing.Status = tenant.Status;
                 existing.MaxUsers = tenant.MaxUsers;
@@ -491,7 +695,7 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 if (adminLogin is not null)
                 {
-                    //adminLogin.RoleId = tenant.RoleId;
+                    
 
                     if (adminLogin.Email != tenant.AdminEmail)
                     {
@@ -501,6 +705,31 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     adminLogin.UpdatedAt = DateTime.UtcNow;
                     adminLogin.UpdatedBy = 1;
                 }
+
+                var isolation = await _masterDbcontext.TenantIsolations
+           .FirstOrDefaultAsync(t => t.TenantId == tenant.TenantId);
+
+                if (isolation != null)
+                {
+                    isolation.TenantName = tenant.TenantName;
+                    isolation.CustomBranding = tenant.EnableBranding;
+                    isolation.LogoUrl = tenant.EnableBranding ? existing.BrandingLogoUrl : null;
+
+                    _masterDbcontext.TenantIsolations.Update(isolation);
+                }
+                else
+                {
+                    await _masterDbcontext.TenantIsolations.AddAsync(new TenantIsolation
+                    {
+                        TenantId = tenant.TenantId,
+                        TenantName = tenant.TenantName,
+                        CustomBranding = tenant.EnableBranding,
+                        LogoUrl = tenant.EnableBranding ? existing.BrandingLogoUrl : null,
+                        DataEncryption = "Disabled"
+                    });
+                }
+
+                await _masterDbcontext.SaveChangesAsync();
 
                 var ctx = _httpContextAccessor.HttpContext;
                 var auditData = new Audit_Log_MasterDb()
@@ -519,12 +748,14 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
                 await _masterDbcontext.Audit_Log_MasterDb.AddAsync(auditData);
                 await _masterDbcontext.SaveChangesAsync();
+                await tran.CommitAsync();
 
                 response.StatusCode = StatusCode.Success;
                 response.StatusMessage = TenantStatusMessage.TenantUpdated;
             }
             catch (Exception ex)
             {
+                await tran.RollbackAsync();
                 await _exceptionLogger.LogExceptionAsync(
                     ex,
                     sourceModule: "TenantModule",
@@ -651,11 +882,11 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     existingTenant.IsActive = false;
 
                     var existingMapTanent = await _masterDbcontext.TenantMasterMapping.FirstOrDefaultAsync(t => t.TenantId == Id && t.IsDeleted == false);
-                    existingMapTanent.IsDeleted = true;
+                    existingMapTanent!.IsDeleted = true;
                     existingMapTanent.IsActive = false;
 
                     var existingLoginTanent = await _masterDbcontext.TenantAdminLogins.FirstOrDefaultAsync(t => t.TenantId == Id && t.IsDeleted == false);
-                    existingLoginTanent.IsDeleted = true;
+                    existingLoginTanent!.IsDeleted = true;
                     existingLoginTanent.IsActive = false;
 
                     var tenantUsers = await _masterDbcontext.GlobalUsers
@@ -811,6 +1042,18 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 await _masterDbcontext.Audit_Log_MasterDb.AddAsync(auditData);
 
                 await _masterDbcontext.SaveChangesAsync();
+
+                // Redis Cache Clear for TenantAdmin
+                if (tenantAdmin != null)
+                {
+                    var redisDb = _redis.GetDatabase();
+
+                    string cacheKey = $"user-status:{Id}:{tenantAdmin.Id}";
+
+                    await redisDb.KeyDeleteAsync(cacheKey);
+                }
+
+
                 response.StatusCode = StatusCode.Success;
                 response.StatusMessage = TenantStatusMessage.LogOutRequest;
 
@@ -884,9 +1127,20 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     Ipaddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString()
                 });
 
-                // ✅ Save changes
+                
                 tenant.UpdatedAt = now;
                 await _masterDbcontext.SaveChangesAsync();
+
+                // Redis Cache Clear
+                if (tenantAdmin != null)
+                {
+                    var redisDb = _redis.GetDatabase();
+
+                    string cacheKey = $"user-status:{tenantId}:{tenantAdmin.Id}";
+
+                    await redisDb.KeyDeleteAsync(cacheKey);
+                }
+
 
                 response.StatusCode = StatusCode.Success;
                 response.StatusMessage = string.Format(
@@ -948,6 +1202,97 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
             }
 
             return response;
+        }
+
+        public async Task<GetSpecificRecord<TenantDashboardDto>>
+        GetTenantDashboard(int tenantId)
+        {
+            var response = new GetSpecificRecord<TenantDashboardDto>();
+
+            try
+            {
+                var tenant = await _masterDbcontext.FactoryTenants
+                    .FirstOrDefaultAsync(t =>
+                        t.TenantId == tenantId &&
+                        !t.IsDeleted &&
+                        t.IsActive);
+
+                if (tenant == null)
+                {
+                    response.StatusCode = StatusCode.NotFound;
+                    response.StatusMessage = "Tenant not found";
+                    return response;
+                }
+
+                // Tenant DB Context
+                using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
+
+                int activeUsers = await tenantDb.FactoryUsers
+                    .CountAsync(x => x.IsActive && !x.IsDeleted);
+
+                int totalAssets = await tenantDb.AssetRegistry
+                    .CountAsync(x => !x.IsDeleted);
+
+                // Storage Calculation
+                double usedStorageGB = 0;
+                var mapping = await _masterDbcontext.TenantMasterMapping
+                    .FirstAsync(x => x.TenantId == tenantId);
+
+                await _masterDbcontext.Database.OpenConnectionAsync();
+                var cmd = _masterDbcontext.Database.GetDbConnection().CreateCommand();
+                cmd.CommandText = "SELECT pg_database_size(@db)";
+                cmd.Parameters.Add(new NpgsqlParameter("db", mapping.DbName));
+
+                long sizeBytes = Convert.ToInt64(await cmd.ExecuteScalarAsync());
+                usedStorageGB = sizeBytes / (1024.0 * 1024 * 1024);
+                await _masterDbcontext.Database.CloseConnectionAsync();
+
+                response.Data = new TenantDashboardDto
+                {
+                    TenantId = tenant.TenantId,
+                    TenantName = tenant.TenantName,
+                    AdminEmail = tenant.AdminEmail,
+                    Plan = tenant.Plan,
+
+                    ActiveUsers = activeUsers,
+                    MaxUsers = tenant.MaxUsers,
+
+                    TotalAssets = totalAssets,
+                    MaxAssets = tenant.MaxAssets,
+
+                    UsedStorageGB = usedStorageGB,
+                    MaxStorageGB = tenant.MaxStorage,
+
+                    ContactNumber = tenant.ContactNumber,
+                    LastActiveDate = tenant.LastActiveDate
+                };
+
+                response.StatusCode = StatusCode.Success;
+                response.StatusMessage = "Dashboard fetched";
+            }
+            catch (Exception ex)
+            {
+                await _exceptionLogger.LogExceptionAsync(
+                    ex,
+                    "TenantDashboard",
+                    "GetDashboard",
+                    tenantId,
+                    null);
+
+                response.StatusCode = StatusCode.Error;
+                response.StatusMessage = ex.Message;
+            }
+
+            return response;
+        }
+
+        private string GenerateSafeDbName(string tenantName)
+        {
+            return "FactoryOperation_" + tenantName
+                .Trim()
+                .ToLower()
+                .Replace(" ", "_")
+                .Replace("-", "_");
         }
 
     }

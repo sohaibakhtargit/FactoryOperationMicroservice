@@ -7,5 +7,6 @@ namespace FactoryOperation_NotificationService.Controllers
     [ApiController]
     public class HealthController : ControllerBase
     {
+
     }
 }

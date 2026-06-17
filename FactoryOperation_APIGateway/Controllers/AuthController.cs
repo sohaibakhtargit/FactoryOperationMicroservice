@@ -1,8 +1,10 @@
 ﻿using FactoryOperation_API_Gateway.FactoryOpsApp.Application.Models;
+using FactoryOperation_API_Gateway.FactoryOpsApp.Infrastructure.Services.Implementations;
 using FactoryOperation_API_Gateway.FactoryOpsApp.Infrastructure.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace FactoryOperation_API_Gateway.Controllers
 {
@@ -61,14 +63,14 @@ namespace FactoryOperation_API_Gateway.Controllers
         [HttpPost("forget-password")]
         public async Task<ActionResult> ForgetPassword([FromBody] ForgetPasswordRequest request)
         {
-            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.NewPassword))
+            if (string.IsNullOrEmpty(request.Email))
             {
-                return BadRequest(new { error = "Email and NewPassword are required." });
+                return BadRequest(new { error = "Email are required." });
             }
 
             try
             {
-                var response = await _authService.ForgetPasswordAsync(request.Email, request.NewPassword);
+                var response = await _authService.ForgetPasswordAsync(request.Email);
                 var content = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
@@ -84,6 +86,41 @@ namespace FactoryOperation_API_Gateway.Controllers
             {
                 _logger.LogError(ex, "Error during password reset for email: {Email}", request.Email);
                 return StatusCode(500, new { error = "Authentication service unavailable" });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpPost("reset-password")]
+        public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordDTO dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.NewPassword))
+            {
+                return BadRequest(new
+                {
+                    error = "Email and NewPassword are required."
+                });
+            }
+
+            try
+            {
+                var response = await _authService.ResetPasswordAsync(dto);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return Content(content, "application/json");
+                }
+
+                return StatusCode((int)response.StatusCode, content);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during reset password for email: {Email}", dto.Email);
+
+                return StatusCode(500, new
+                {
+                    error = "Authentication service unavailable"
+                });
             }
         }
 
@@ -179,16 +216,70 @@ namespace FactoryOperation_API_Gateway.Controllers
             }
             return null;
         }
+
+        //[AllowAnonymous]
+        //[HttpPost("verifyOtp")]
+        //public async Task<IActionResult> VerifyOtp([FromBody] VerifyOTPDto verifyotp)
+        //{
+        //    var result = await _authService.VerifyOtp(verifyotp);
+        //    return Ok(result);
+        //}
+
+        [AllowAnonymous]
+        [HttpPost("verifyOtp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOTPDto verifyotp)
+        {
+            try
+            {
+                var response = await _authService.VerifyOtp(verifyotp);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return Content(content, "application/json");
+                }
+                else
+                {
+                    return BadRequest(new { error = "OTP verification failed" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during OTP verification");
+                return StatusCode(500, new { error = "Authentication service unavailable" });
+            }
+        }
+
     }
 
     public class ForgetPasswordRequest
     {
         public string Email { get; set; } = string.Empty;
-        public string NewPassword { get; set; } = string.Empty;
     }
 
     public class SwitchTenantRequest
     {
         public int TenantId { get; set; }
     }
+
+    public class VerifyOTPDto
+    {
+        public int TenantId { get; set; }
+        public int UserId { get; set; }
+        public string? Otp { get; set; }
+    }
+
+
+    public class ResetPasswordDTO
+    {
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "New password is required.")]
+        [MinLength(8, ErrorMessage = "Password must be at least 8 characters long.")]
+        public string NewPassword { get; set; } = string.Empty;
+        public string OTP { get; set; } = string.Empty;
+    }
+
 }

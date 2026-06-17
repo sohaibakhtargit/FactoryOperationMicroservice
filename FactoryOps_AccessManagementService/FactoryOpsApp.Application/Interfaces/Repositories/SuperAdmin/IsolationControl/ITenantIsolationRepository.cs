@@ -14,7 +14,6 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Application.Int
         Task<bool> UpdateComplianceAuditAsync(FactoryComplianceAndAudit audit);
         Task<bool> DeleteComplianceAuditAsync(int id);
 
-        //
         Task<CommonResponseModel> UpsertAuditComplianceMetricAsync(UpdateAuditComplianceMetricsDto dto);
         GetAllRecord<GetAuditComplianceMetricsDto?> GetAuditComplianceMetricsAsync();
 

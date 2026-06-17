@@ -1,6 +1,4 @@
 ﻿using FactoryOpsApp.Application.Interfaces.Services.TenantAdmin.Common;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 
 namespace FactoryOpsApp.Infrastructure.Service
 {
@@ -31,7 +29,7 @@ namespace FactoryOpsApp.Infrastructure.Service
                 await file.CopyToAsync(stream);
             }
 
-            return Path.Combine(folderName, uniqueFileName); 
+            return Path.Combine(folderName, uniqueFileName);
         }
 
         public async Task<byte[]> GetFileBytesAsync(string filePath)

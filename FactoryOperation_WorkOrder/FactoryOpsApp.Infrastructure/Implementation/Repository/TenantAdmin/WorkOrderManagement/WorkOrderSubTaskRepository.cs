@@ -23,7 +23,6 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
             _auditLogger = auditLogger;
         }
 
-
         public async Task<GetAllRecord<WorkOrderWithSubTasksDto>> GetAllWorkOrderSubTaskAsync(int tenantId)
         {
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(tenantId);
@@ -36,12 +35,12 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
                                       WorkOrderId = w.WorkOrderId,
                                       WorkOrderNumber = w.WorkOrderNumber,
                                       WorkOrderTitle = w.Title,
-                                      WorkOrderStatus = w.Status.ToString(),
-                                      WorkOrderPriority = w.Priority.ToString(),
+                                      WorkOrderStatus = w.Status.ToString()!,
+                                      WorkOrderPriority = w.Priority.ToString()!,
 
                                       EstimatedDurationInMinutes = w.EstimatedDurationMinutes,
 
-                                      SubTasks = w.WorkOrderSubTasks
+                                      SubTasks = w.WorkOrderSubTasks!
                             .Where(s => s.IsActive)
                             .Select(s => new WorkOrderSubTaskDto
                             {
@@ -56,7 +55,7 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
                                 ActualMinutes = s.ActualMinutes,
                                 AssignedToUserId = s.AssignedToUserId,
                                 AssignedToUserName = s.AssignedToUser != null
-                                    ? s.AssignedToUser.FirstName + " " + s.AssignedToUser.LastName
+                                ? s.AssignedToUser.FirstName + " " + s.AssignedToUser.LastName
                                     : null,
                                 AssignedToTeamId = s.AssignedToTeamId,
                                 AssignedToTeamName = s.AssignedToTeam != null
@@ -82,9 +81,7 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
                     GetAllData = data
                 };
             }
-            
-
-
+         
         public async Task<GetSpecificRecord<WorkOrderSubTaskDto>> GetWorkOrderSubTaskByIdAsync(int tenantId, int subTaskId)
         {
             
@@ -143,7 +140,7 @@ namespace FactoryOperation_WorkOrder.FactoryOpsApp.Infrastructure.Implementation
             
                 using var tenantDb = _tenantDbContext.GetTenantDbContext(dto.TenantId);
 
-                // ✅ Ensure WorkOrder exists
+               
                 var workOrderExists = await tenantDb.WorkOrders
                     .AnyAsync(w => w.WorkOrderId == dto.WorkOrderId && w.TenantId == dto.TenantId && !w.IsDeleted);
 

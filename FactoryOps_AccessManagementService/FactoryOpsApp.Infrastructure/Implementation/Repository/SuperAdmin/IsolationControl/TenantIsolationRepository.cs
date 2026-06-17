@@ -63,7 +63,16 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 existing.TenantName = isolation.TenantName;
                 existing.EncryptionKeyId = isolation.EncryptionKeyId;
                 existing.CustomBranding = isolation.CustomBranding;
-                existing.LogoUrl = isolation.LogoUrl;
+                if (!string.IsNullOrWhiteSpace(isolation.LogoUrl))
+                {
+                    existing.LogoUrl = isolation.LogoUrl;
+                }
+
+                if (!string.IsNullOrWhiteSpace(isolation.LogoText))
+                {
+                    existing.LogoText = isolation.LogoText;
+                }
+
                 existing.ColorScheme = isolation.ColorScheme;
                 existing.DataPartitionId = isolation.DataPartitionId;
                 _dbContext.TenantIsolations.Update(existing);
@@ -171,16 +180,16 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                     entity = new AuditComplianceMetric
                     {
                         TenantId = dto.TenantId,
-                        IsolationLevel = dto.IsolationLevel,
-                        DataRegion = dto.DataRegion,
-                        ComplianceLevel = dto.ComplianceLevel,
+                        IsolationLevel = dto.IsolationLevel!,
+                        DataRegion = dto.DataRegion!,
+                        ComplianceLevel = dto.ComplianceLevel!,
                         LastAuditDate = dto.LastAuditDate,
                         MonthlyMaintenanceCost = dto.MonthlyMaintenanceCost,
 
-                        ValidationIsolationLevel = dto.ValidationIsolationLevel,
-                        ValidationSchemaIsolation = dto.ValidationSchemaIsolation,
-                        ValidationFileStorage = dto.ValidationFileStorage,
-                        ValidationApiAccessControl = dto.ValidationApiAccessControl,
+                        ValidationIsolationLevel = dto.ValidationIsolationLevel!,
+                        ValidationSchemaIsolation = dto.ValidationSchemaIsolation!,
+                        ValidationFileStorage = dto.ValidationFileStorage!,
+                        ValidationApiAccessControl = dto.ValidationApiAccessControl!,
                         ValidationTimestamp = dto.ValidationTimestamp,
 
                         MetricDataIntegrityScore = dto.MetricDataIntegrityScore,
@@ -210,16 +219,16 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
                 }
                 else
                 {
-                    entity.IsolationLevel = dto.IsolationLevel;
-                    entity.DataRegion = dto.DataRegion;
-                    entity.ComplianceLevel = dto.ComplianceLevel;
+                    entity.IsolationLevel = dto.IsolationLevel!;
+                    entity.DataRegion = dto.DataRegion!;
+                    entity.ComplianceLevel = dto.ComplianceLevel!;
                     entity.LastAuditDate = dto.LastAuditDate;
                     entity.MonthlyMaintenanceCost = dto.MonthlyMaintenanceCost;
 
-                    entity.ValidationIsolationLevel = dto.ValidationIsolationLevel;
-                    entity.ValidationSchemaIsolation = dto.ValidationSchemaIsolation;
-                    entity.ValidationFileStorage = dto.ValidationFileStorage;
-                    entity.ValidationApiAccessControl = dto.ValidationApiAccessControl;
+                    entity.ValidationIsolationLevel = dto.ValidationIsolationLevel!;
+                    entity.ValidationSchemaIsolation = dto.ValidationSchemaIsolation!;
+                    entity.ValidationFileStorage = dto.ValidationFileStorage!;
+                    entity.ValidationApiAccessControl = dto.ValidationApiAccessControl!;
                     entity.ValidationTimestamp = dto.ValidationTimestamp;
 
                     entity.MetricDataIntegrityScore = dto.MetricDataIntegrityScore;
@@ -276,7 +285,6 @@ namespace FactoryOperation_AccessManagementService.FactoryOpsApp.Infrastructure.
 
             return response;
         }
-
 
         public GetAllRecord<GetAuditComplianceMetricsDto?> GetAuditComplianceMetricsAsync()
         {

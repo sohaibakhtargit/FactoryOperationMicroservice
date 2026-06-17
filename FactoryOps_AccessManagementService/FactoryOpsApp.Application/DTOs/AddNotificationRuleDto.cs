@@ -11,7 +11,7 @@ namespace FactoryOpsApp.Application.DTOs
         public int TenantId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string TriggerEvent { get; set; } = string.Empty;
-        public string Channel { get; set; } = string.Empty;  // e.g., Email, SMS, InApp
+        public string Channel { get; set; } = string.Empty;  
         public string Recipient { get; set; } = string.Empty;
         public bool IsEnabled { get; set; } = true;
     }
